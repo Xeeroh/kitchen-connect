@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, ChefHat, Package, Settings } from "lucide-react";
+import { ShoppingCart, ChefHat, Package, Settings, BarChart3 } from "lucide-react";
 
 const Index = () => {
   return (
@@ -9,7 +9,7 @@ const Index = () => {
         <h1 className="text-5xl font-bold text-primary font-heading">🍽️ RestoPOS</h1>
         <p className="text-lg text-muted-foreground">Restaurant Point of Sale System</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
           <Link to="/pos">
             <div className="glass-card p-6 hover:border-primary/50 transition-all cursor-pointer group">
               <ShoppingCart className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
@@ -29,6 +29,13 @@ const Index = () => {
               <Package className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
               <h2 className="font-semibold">Pickup</h2>
               <p className="text-xs text-muted-foreground mt-1">Hand off orders</p>
+            </div>
+          </Link>
+          <Link to="/accounting">
+            <div className="glass-card p-6 hover:border-primary/50 transition-all cursor-pointer group">
+              <BarChart3 className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <h2 className="font-semibold">Accounting</h2>
+              <p className="text-xs text-muted-foreground mt-1">Daily recap</p>
             </div>
           </Link>
         </div>
