@@ -12,6 +12,8 @@ export interface OrderItem {
   notes?: string;
 }
 
+export type PaymentMethod = "cash" | "card" | "transfer";
+
 export type OrderStatus = "pending" | "preparing" | "ready" | "picked_up";
 
 export interface Order {
@@ -22,6 +24,7 @@ export interface Order {
   createdAt: Date;
   tableNumber?: number;
   customerName?: string;
+  paymentMethod: PaymentMethod;
 }
 
 export const categories = ["Starters", "Mains", "Sides", "Drinks", "Desserts"];

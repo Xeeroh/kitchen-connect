@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { Order, OrderItem, OrderStatus, defaultMenu, MenuItem } from "@/data/menu";
+import { Order, OrderItem, OrderStatus, PaymentMethod, defaultMenu, MenuItem } from "@/data/menu";
 
 interface OrderContextType {
   orders: Order[];
   menu: MenuItem[];
   setMenu: React.Dispatch<React.SetStateAction<MenuItem[]>>;
-  addOrder: (items: OrderItem[], tableNumber?: number, customerName?: string) => void;
+  addOrder: (items: OrderItem[], paymentMethod: PaymentMethod, tableNumber?: number, customerName?: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   getOrdersByStatus: (status: OrderStatus) => Order[];
   orderCounter: number;
@@ -24,7 +24,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [menu, setMenu] = useState<MenuItem[]>(defaultMenu);
   const [orderCounter, setOrderCounter] = useState(1);
 
-  const addOrder = useCallback((items: OrderItem[], tableNumber?: number, customerName?: string) => {
+  const addOrder = useCallback((items: OrderItem[], paymentMethod: PaymentMethod, tableNumber?: number, customerName?: string) => {
     const total = items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
     const newOrder: Order = {
       id: `#${String(orderCounter).padStart(3, "0")}`,
@@ -34,6 +34,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: new Date(),
       tableNumber,
       customerName,
+      paymentMethod,
     };
     setOrders((prev) => [newOrder, ...prev]);
     setOrderCounter((c) => c + 1);

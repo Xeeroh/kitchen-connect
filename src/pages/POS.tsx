@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useOrders } from "@/contexts/OrderContext";
-import { categories, MenuItem, OrderItem } from "@/data/menu";
+import { categories, MenuItem, OrderItem, PaymentMethod } from "@/data/menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, Trash2, Plus, Minus, Send } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, Send, Banknote, CreditCard, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
@@ -13,6 +13,7 @@ const POS = () => {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [tableNumber, setTableNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
 
   const addToCart = (item: MenuItem) => {
     setCart((prev) => {
@@ -32,10 +33,11 @@ const POS = () => {
 
   const placeOrder = () => {
     if (cart.length === 0) return;
-    addOrder(cart, tableNumber ? parseInt(tableNumber) : undefined, customerName || undefined);
+    addOrder(cart, paymentMethod, tableNumber ? parseInt(tableNumber) : undefined, customerName || undefined);
     setCart([]);
     setTableNumber("");
     setCustomerName("");
+    setPaymentMethod("cash");
     toast.success("Order placed!");
   };
 
@@ -141,6 +143,31 @@ const POS = () => {
           </div>
 
           <div className="p-3 border-t border-border/50 space-y-3">
+            {/* Payment method selector */}
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground font-medium">Payment Method</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: "cash" as PaymentMethod, label: "Cash", icon: <Banknote className="w-4 h-4" /> },
+                  { value: "card" as PaymentMethod, label: "Card", icon: <CreditCard className="w-4 h-4" /> },
+                  { value: "transfer" as PaymentMethod, label: "Transfer", icon: <ArrowRightLeft className="w-4 h-4" /> },
+                ]).map((pm) => (
+                  <button
+                    key={pm.value}
+                    onClick={() => setPaymentMethod(pm.value)}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-lg text-xs font-medium transition-all ${
+                      paymentMethod === pm.value
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    {pm.icon}
+                    {pm.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="flex justify-between text-lg font-bold">
               <span>Total</span>
               <span className="text-primary">${total.toFixed(2)}</span>

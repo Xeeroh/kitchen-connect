@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useOrders } from "@/contexts/OrderContext";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package } from "lucide-react";
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft } from "lucide-react";
 
 const Accounting = () => {
   const { orders } = useOrders();
@@ -41,7 +41,16 @@ const Accounting = () => {
     );
     const categoryBreakdown = Object.entries(catRevenue).sort((a, b) => b[1] - a[1]);
 
-    return { todayOrders, completed, active, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown };
+    // Payment method breakdown
+    const paymentBreakdown: Record<string, { count: number; revenue: number }> = {};
+    completed.forEach((o) => {
+      const pm = o.paymentMethod || "cash";
+      if (!paymentBreakdown[pm]) paymentBreakdown[pm] = { count: 0, revenue: 0 };
+      paymentBreakdown[pm].count++;
+      paymentBreakdown[pm].revenue += o.total;
+    });
+
+    return { todayOrders, completed, active, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
   }, [orders]);
 
   return (
@@ -91,6 +100,24 @@ const Accounting = () => {
             </div>
             <p className="text-2xl font-bold text-warning">${stats.pendingRevenue.toFixed(2)}</p>
           </div>
+        </div>
+
+        {/* Payment method breakdown */}
+        <div className="grid grid-cols-3 gap-3">
+          {(["cash", "card", "transfer"] as const).map((pm) => {
+            const data = stats.paymentBreakdown[pm] || { count: 0, revenue: 0 };
+            const icons = { cash: <Banknote className="w-5 h-5" />, card: <CreditCard className="w-5 h-5" />, transfer: <ArrowRightLeft className="w-5 h-5" /> };
+            return (
+              <div key={pm} className="glass-card p-4 flex items-center gap-3">
+                <div className="text-primary">{icons[pm]}</div>
+                <div>
+                  <p className="text-xs text-muted-foreground capitalize">{pm}</p>
+                  <p className="font-bold">${data.revenue.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">{data.count} orders</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
