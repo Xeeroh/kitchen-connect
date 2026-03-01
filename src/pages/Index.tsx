@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, ChefHat, Package } from "lucide-react";
+import { ShoppingCart, ChefHat, Package, Settings } from "lucide-react";
 
 const Index = () => {
   return (
@@ -32,6 +32,12 @@ const Index = () => {
             </div>
           </Link>
         </div>
+
+        <Link to="/menu">
+          <Button variant="outline" size="sm" className="mt-4">
+            <Settings className="w-4 h-4 mr-1" /> Manage Menu
+          </Button>
+        </Link>
       </div>
     </div>
   );
