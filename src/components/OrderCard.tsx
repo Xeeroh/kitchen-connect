@@ -1,6 +1,12 @@
 import { Order, OrderStatus } from "@/data/menu";
 import { Button } from "@/components/ui/button";
-import { Clock, ChefHat, Package, Check } from "lucide-react";
+import { Clock, ChefHat, Package, Check, Banknote, CreditCard, ArrowRightLeft } from "lucide-react";
+
+const paymentIcons = {
+  cash: <Banknote className="w-3 h-3" />,
+  card: <CreditCard className="w-3 h-3" />,
+  transfer: <ArrowRightLeft className="w-3 h-3" />,
+};
 
 const statusConfig: Record<OrderStatus, { label: string; class: string; icon: React.ReactNode }> = {
   pending: { label: "New", class: "status-pending", icon: <Clock className="w-4 h-4" /> },
@@ -50,8 +56,9 @@ const OrderCard = ({ order, nextStatus, nextLabel, onAdvance }: OrderCardProps) 
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-border/50">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="w-3 h-3" /> {elapsed}m ago
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {elapsed}m</span>
+          <span className="flex items-center gap-1">{paymentIcons[order.paymentMethod]} {order.paymentMethod}</span>
         </div>
         <span className="font-semibold text-primary">${order.total.toFixed(2)}</span>
       </div>
