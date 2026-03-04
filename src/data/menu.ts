@@ -18,7 +18,8 @@ export type OrderStatus = "pending" | "preparing" | "ready" | "picked_up";
 
 export interface Tab {
   id: string;
-  items: OrderItem[];
+  items: OrderItem[];        // all items on the tab
+  sentItems: OrderItem[];    // items already sent to kitchen
   total: number;
   createdAt: Date;
   tableNumber?: number;
@@ -34,6 +35,7 @@ export interface Order {
   tableNumber?: number;
   customerName?: string;
   paymentMethod: PaymentMethod;
+  tabId?: string;
 }
 
 export const categories = ["Starters", "Mains", "Sides", "Drinks", "Desserts"];
