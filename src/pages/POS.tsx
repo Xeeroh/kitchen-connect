@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ShoppingCart, Trash2, Plus, Minus, Banknote, CreditCard, ArrowRightLeft,
-  PlusCircle, X, Receipt, Edit2, Check,
+  PlusCircle, X, Receipt, Check, Send, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -14,13 +14,15 @@ import {
 } from "@/components/ui/dialog";
 
 const POS = () => {
-  const { menu, tabs, openTab, addItemToTab, updateTabItemQuantity, updateTab, closeTab, deleteTab } = useOrders();
+  const {
+    menu, tabs, openTab, addItemToTab, updateTabItemQuantity,
+    updateTab, sendToKitchen, closeTab, deleteTab, getUnsentItems,
+  } = useOrders();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [payDialogTabId, setPayDialogTabId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
 
-  // New tab form
   const [showNewTab, setShowNewTab] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
@@ -28,6 +30,8 @@ const POS = () => {
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const filteredItems = menu.filter((m) => m.category === activeCategory);
   const payTab = tabs.find((t) => t.id === payDialogTabId);
+  const unsentItems = activeTab ? getUnsentItems(activeTab) : [];
+  const hasUnsent = unsentItems.length > 0;
 
   const handleOpenTab = () => {
     const id = openTab(
@@ -41,19 +45,41 @@ const POS = () => {
     toast.success("Tab opened!");
   };
 
+  const handleSendToKitchen = () => {
+    if (!activeTab) return;
+    sendToKitchen(activeTab.id);
+    toast.success("Order sent to kitchen!");
+  };
+
   const handleCloseTab = () => {
     if (!payDialogTabId) return;
     closeTab(payDialogTabId, paymentMethod);
-    if (activeTabId === payDialogTabId) setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== payDialogTabId)?.id || null : null);
+    if (activeTabId === payDialogTabId) {
+      setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== payDialogTabId)?.id || null : null);
+    }
     setPayDialogTabId(null);
     setPaymentMethod("cash");
-    toast.success("Tab closed & order sent to kitchen!");
+    toast.success("Tab closed & paid!");
   };
 
   const handleDeleteTab = (tabId: string) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab && tab.sentItems.length > 0) {
+      toast.error("Can't delete a tab with orders already sent to kitchen");
+      return;
+    }
     deleteTab(tabId);
-    if (activeTabId === tabId) setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== tabId)?.id || null : null);
+    if (activeTabId === tabId) {
+      setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== tabId)?.id || null : null);
+    }
     toast("Tab deleted");
+  };
+
+  // Check if an item has been sent (can't go below sent qty)
+  const getSentQty = (itemId: string) => {
+    if (!activeTab) return 0;
+    const sent = activeTab.sentItems.find((s) => s.menuItem.id === itemId);
+    return sent ? sent.quantity : 0;
   };
 
   return (
@@ -69,27 +95,35 @@ const POS = () => {
 
       {/* Tabs bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-card/30 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTabId(tab.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all group ${
-              activeTabId === tab.id
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            }`}
-          >
-            <Receipt className="w-3.5 h-3.5" />
-            {tab.tableNumber ? `Table ${tab.tableNumber}` : tab.customerName || tab.id.replace("tab-", "Tab #")}
-            <span className="text-xs opacity-70">${tab.total.toFixed(2)}</span>
-            <span
-              onClick={(e) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
-              className="p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
+        {tabs.map((tab) => {
+          const tabUnsent = getUnsentItems(tab);
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTabId(tab.id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all group relative ${
+                activeTabId === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
             >
-              <X className="w-3 h-3" />
-            </span>
-          </button>
-        ))}
+              <Receipt className="w-3.5 h-3.5" />
+              {tab.tableNumber ? `Table ${tab.tableNumber}` : tab.customerName || tab.id.replace("tab-", "Tab #")}
+              <span className="text-xs opacity-70">${tab.total.toFixed(2)}</span>
+              {tabUnsent.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-warning absolute -top-0.5 -right-0.5" />
+              )}
+              {tab.sentItems.length === 0 && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
+                  className="p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           onClick={() => setShowNewTab(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors whitespace-nowrap"
@@ -98,7 +132,7 @@ const POS = () => {
         </button>
       </div>
 
-      {/* New tab inline form */}
+      {/* New tab form */}
       {showNewTab && (
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30 bg-secondary/30">
           <Input placeholder="Table # (optional)" value={newTableNumber} onChange={(e) => setNewTableNumber(e.target.value)} className="h-8 text-sm w-28" />
@@ -124,7 +158,6 @@ const POS = () => {
         <div className="flex flex-1 overflow-hidden">
           {/* Menu area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Categories */}
             <div className="flex gap-2 p-3 overflow-x-auto border-b border-border/30">
               {categories.map((cat) => (
                 <button
@@ -141,7 +174,6 @@ const POS = () => {
               ))}
             </div>
 
-            {/* Items grid */}
             <div className="flex-1 overflow-y-auto p-3">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {filteredItems.map((item) => (
@@ -171,7 +203,6 @@ const POS = () => {
                   {activeTab.items.reduce((s, i) => s + i.quantity, 0)} items
                 </span>
               </div>
-              {/* Editable tab info */}
               <div className="flex gap-2">
                 <Input
                   placeholder="Table #"
@@ -188,44 +219,98 @@ const POS = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
               {activeTab.items.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">Tap items to add them</p>
               )}
-              {activeTab.items.map((item) => (
-                <div key={item.menuItem.id} className="flex items-center gap-2 p-2 rounded-md bg-secondary/50">
-                  <span className="text-lg">{item.menuItem.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
-                    <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1)} className="p-1 rounded hover:bg-muted">
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-sm w-6 text-center">{item.quantity}</span>
-                    <button onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, 1)} className="p-1 rounded hover:bg-muted">
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <button onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -item.quantity)} className="p-1 text-destructive hover:bg-destructive/10 rounded">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+
+              {/* Sent items section */}
+              {activeTab.sentItems.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-xs text-muted-foreground font-medium mb-1.5 flex items-center gap-1">
+                    <Check className="w-3 h-3 text-success" /> Sent to kitchen
+                  </p>
+                  {activeTab.sentItems.map((item) => (
+                    <div key={`sent-${item.menuItem.id}`} className="flex items-center gap-2 p-2 rounded-md bg-secondary/30 opacity-60 mb-1">
+                      <span className="text-lg">{item.menuItem.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                        <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
+                      </div>
+                      <span className="text-sm text-muted-foreground w-6 text-center">×{item.quantity}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
+              {/* Unsent items section */}
+              {hasUnsent && (
+                <div>
+                  {activeTab.sentItems.length > 0 && (
+                    <p className="text-xs text-warning font-medium mb-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> New — not sent yet
+                    </p>
+                  )}
+                  {unsentItems.map((item) => {
+                    const totalQty = activeTab.items.find((i) => i.menuItem.id === item.menuItem.id)!.quantity;
+                    const sentQty = getSentQty(item.menuItem.id);
+                    return (
+                      <div key={`unsent-${item.menuItem.id}`} className="flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/20 mb-1">
+                        <span className="text-lg">{item.menuItem.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                          <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1)}
+                            className={`p-1 rounded hover:bg-muted ${totalQty <= sentQty ? "opacity-30 pointer-events-none" : ""}`}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-sm w-6 text-center">{item.quantity}</span>
+                          <button onClick={() => addItemToTab(activeTab.id, item.menuItem)} className="p-1 rounded hover:bg-muted">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -(item.quantity))}
+                          className={`p-1 text-destructive hover:bg-destructive/10 rounded ${sentQty > 0 ? "opacity-30 pointer-events-none" : ""}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="p-3 border-t border-border/50 space-y-3">
+            <div className="p-3 border-t border-border/50 space-y-2">
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
                 <span className="text-primary">${activeTab.total.toFixed(2)}</span>
               </div>
+
+              {/* Send to kitchen button */}
               <Button
-                className="w-full h-12 text-base font-semibold"
+                className="w-full h-10"
+                variant={hasUnsent ? "default" : "secondary"}
+                onClick={handleSendToKitchen}
+                disabled={!hasUnsent}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {hasUnsent ? `Send ${unsentItems.reduce((s, i) => s + i.quantity, 0)} new items to Kitchen` : "All items sent ✓"}
+              </Button>
+
+              {/* Close & pay button */}
+              <Button
+                className="w-full h-10"
+                variant="outline"
                 onClick={() => { setPaymentMethod("cash"); setPayDialogTabId(activeTab.id); }}
                 disabled={activeTab.items.length === 0}
               >
-                <Banknote className="w-4 h-4 mr-2" /> Close & Pay
+                <Banknote className="w-4 h-4 mr-2" /> Close & Pay Tab
               </Button>
             </div>
           </div>
@@ -236,11 +321,14 @@ const POS = () => {
       <Dialog open={!!payDialogTabId} onOpenChange={(open) => !open && setPayDialogTabId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Close Tab</DialogTitle>
+            <DialogTitle>Close Tab & Pay</DialogTitle>
             <DialogDescription>
               {payTab && (
                 <>
-                  {payTab.tableNumber ? `Table ${payTab.tableNumber}` : payTab.customerName || "Tab"} — <strong>${payTab.total.toFixed(2)}</strong>
+                  {payTab.tableNumber ? `Table ${payTab.tableNumber}` : payTab.customerName || "Tab"} — Total: <strong>${payTab.total.toFixed(2)}</strong>
+                  {getUnsentItems(payTab).length > 0 && (
+                    <span className="block text-warning text-xs mt-1">⚠ Unsent items will also be sent to kitchen</span>
+                  )}
                 </>
               )}
             </DialogDescription>
