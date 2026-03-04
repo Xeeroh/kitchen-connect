@@ -16,6 +16,15 @@ export type PaymentMethod = "cash" | "card" | "transfer";
 
 export type OrderStatus = "pending" | "preparing" | "ready" | "picked_up";
 
+export interface Tab {
+  id: string;
+  items: OrderItem[];
+  total: number;
+  createdAt: Date;
+  tableNumber?: number;
+  customerName?: string;
+}
+
 export interface Order {
   id: string;
   items: OrderItem[];
