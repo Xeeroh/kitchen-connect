@@ -6,8 +6,7 @@ import { ChefHat } from "lucide-react";
 
 const Kitchen = () => {
   const { getOrdersByStatus, updateOrderStatus } = useOrders();
-  const pending = getOrdersByStatus("pending");
-  const preparing = getOrdersByStatus("preparing");
+  const sent = getOrdersByStatus("sent");
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -22,35 +21,19 @@ const Kitchen = () => {
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-2 divide-x divide-border/30">
-        {/* Pending column */}
-        <div className="flex flex-col">
-          <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
-            <span className="status-pending px-2 py-1 rounded text-xs font-medium">New Orders</span>
-            <span className="text-sm text-muted-foreground">{pending.length}</span>
+      <div className="flex-1 max-w-2xl mx-auto w-full border-x border-border/30">
+        {/* New Orders column */}
+        <div className="flex flex-col h-full">
+          <div className="px-4 py-3 border-b border-border/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="status-pending px-2 py-1 rounded text-xs font-medium">New Orders</span>
+              <span className="text-sm text-muted-foreground">{sent.length}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Orders automatically disappear when marked Ready</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {pending.length === 0 && <p className="text-muted-foreground text-center py-12">No new orders</p>}
-            {pending.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                nextLabel="Start Preparing"
-                onAdvance={() => updateOrderStatus(order.id, "preparing")}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Preparing column */}
-        <div className="flex flex-col">
-          <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
-            <span className="status-preparing px-2 py-1 rounded text-xs font-medium">Preparing</span>
-            <span className="text-sm text-muted-foreground">{preparing.length}</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {preparing.length === 0 && <p className="text-muted-foreground text-center py-12">Nothing cooking</p>}
-            {preparing.map((order) => (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {sent.length === 0 && <p className="text-muted-foreground text-center py-12">No new orders in kitchen</p>}
+            {sent.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}

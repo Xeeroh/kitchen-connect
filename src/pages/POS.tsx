@@ -21,11 +21,27 @@ const POS = () => {
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [payDialogTabId, setPayDialogTabId] = useState<string | null>(null);
+  const [deleteDialogTabId, setDeleteDialogTabId] = useState<string | null>(null);
+  const [deleteNote, setDeleteNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
 
   const [showNewTab, setShowNewTab] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
+
+  const [fillingItem, setFillingItem] = useState<MenuItem | null>(null);
+  const [activeFilling, setActiveFilling] = useState<string>("");
+  const [mixtureParts, setMixtureParts] = useState<string[]>([]);
+
+  const categoriesWithFillings = ["Flautas", "Tostadas", "Sopes", "Enchiladas", "Tacos"];
+  const fillingOptions: Record<string, string[]> = {
+    "Flautas": ["Pollo", "Carne"],
+    "Tostadas": ["Mixta", "Pollo", "Carne", "Cueritos"],
+    "Sopes": ["Chicharrón", "Pollo", "Carne", "Picadillo "],
+    "Enchiladas": ["Pollo", "Carne", "Queso", "Cebolla"],
+    "Quesadillas": ["Carne", "Chicharrón", "Rajas", "Queso", "Pollo"],
+    "Tacos": ["Pollo", "Carne", "Papa"],
+  };
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const filteredItems = menu.filter((m) => m.category === activeCategory);
@@ -33,12 +49,12 @@ const POS = () => {
   const unsentItems = activeTab ? getUnsentItems(activeTab) : [];
   const hasUnsent = unsentItems.length > 0;
 
-  const handleOpenTab = () => {
-    const id = openTab(
+  const handleOpenTab = async () => {
+    const id = await openTab(
       newTableNumber ? parseInt(newTableNumber) : undefined,
       newCustomerName || undefined
     );
-    setActiveTabId(id);
+    if (id) setActiveTabId(id);
     setShowNewTab(false);
     setNewTableNumber("");
     setNewCustomerName("");
@@ -55,30 +71,36 @@ const POS = () => {
     if (!payDialogTabId) return;
     closeTab(payDialogTabId, paymentMethod);
     if (activeTabId === payDialogTabId) {
-      setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== payDialogTabId)?.id || null : null);
+      const remainingOpen = tabs.filter(t => t.id !== payDialogTabId && t.status === 'open');
+      setActiveTabId(remainingOpen.length > 0 ? remainingOpen[0].id : null);
     }
     setPayDialogTabId(null);
     setPaymentMethod("cash");
     toast.success("Tab closed & paid!");
   };
 
-  const handleDeleteTab = (tabId: string) => {
-    const tab = tabs.find((t) => t.id === tabId);
-    if (tab && tab.sentItems.length > 0) {
-      toast.error("Can't delete a tab with orders already sent to kitchen");
-      return;
+  const handleDeleteTab = async () => {
+    if (!deleteDialogTabId) return;
+
+    await deleteTab(deleteDialogTabId, deleteNote);
+
+    if (activeTabId === deleteDialogTabId) {
+      const remainingOpen = tabs.filter(t => t.id !== deleteDialogTabId && t.status === 'open');
+      setActiveTabId(remainingOpen.length > 0 ? remainingOpen[0].id : null);
     }
-    deleteTab(tabId);
-    if (activeTabId === tabId) {
-      setActiveTabId(tabs.length > 1 ? tabs.find((t) => t.id !== tabId)?.id || null : null);
-    }
-    toast("Tab deleted");
+
+    setDeleteDialogTabId(null);
+    setDeleteNote("");
+    toast.success("Mesa eliminada correctamente");
   };
 
   // Check if an item has been sent (can't go below sent qty)
-  const getSentQty = (itemId: string) => {
+  const getSentQty = (itemId: string, notes?: string) => {
     if (!activeTab) return 0;
-    const sent = activeTab.sentItems.find((s) => s.menuItem.id === itemId);
+    const sent = activeTab.sentItems.find((s) =>
+      s.menuItem.id === itemId &&
+      (s.notes || '') === (notes || '')
+    );
     return sent ? sent.quantity : 0;
   };
 
@@ -93,34 +115,30 @@ const POS = () => {
         </div>
       </header>
 
-      {/* Tabs bar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-card/30 overflow-x-auto">
-        {tabs.map((tab) => {
+        {tabs.filter(t => t.status === 'open').map((tab) => {
           const tabUnsent = getUnsentItems(tab);
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTabId(tab.id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all group relative ${
-                activeTabId === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all group relative ${activeTabId === tab.id
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
             >
               <Receipt className="w-3.5 h-3.5" />
-              {tab.tableNumber ? `Table ${tab.tableNumber}` : tab.customerName || tab.id.replace("tab-", "Tab #")}
+              {tab.tableNumber ? `Mesa ${tab.tableNumber}` : tab.customerName || tab.id.replace("tab-", "Mesa #")}
               <span className="text-xs opacity-70">${tab.total.toFixed(2)}</span>
               {tabUnsent.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-warning absolute -top-0.5 -right-0.5" />
               )}
-              {tab.sentItems.length === 0 && (
-                <span
-                  onClick={(e) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
-                  className="p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </span>
-              )}
+              <span
+                onClick={(e) => { e.stopPropagation(); setDeleteDialogTabId(tab.id); }}
+                className="p-0.5 rounded hover:bg-destructive/20 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </span>
             </button>
           );
         })}
@@ -134,10 +152,10 @@ const POS = () => {
 
       {/* New tab form */}
       {showNewTab && (
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/30 bg-secondary/30">
-          <Input placeholder="Table # (optional)" value={newTableNumber} onChange={(e) => setNewTableNumber(e.target.value)} className="h-8 text-sm w-28" />
-          <Input placeholder="Customer name (optional)" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="h-8 text-sm w-40" />
-          <Button size="sm" onClick={handleOpenTab}><Check className="w-3 h-3 mr-1" /> Open</Button>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border/30 bg-secondary/30">
+          <Input placeholder="Mesa # (opcional)" value={newTableNumber} onChange={(e) => setNewTableNumber(e.target.value)} className="h-8 text-sm w-28" />
+          <Input placeholder="Cliente (opcional)" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="h-8 text-sm flex-1 min-w-[140px]" />
+          <Button size="sm" onClick={handleOpenTab}><Check className="w-3 h-3 mr-1" /> Abrir</Button>
           <Button size="sm" variant="ghost" onClick={() => setShowNewTab(false)}><X className="w-3 h-3" /></Button>
         </div>
       )}
@@ -147,15 +165,15 @@ const POS = () => {
           <div className="text-center space-y-4">
             <Receipt className="w-16 h-16 text-muted-foreground/30 mx-auto" />
             <p className="text-muted-foreground">
-              {tabs.length === 0 ? "No open tabs. Create one to start taking orders." : "Select a tab to start adding items."}
+              {tabs.length === 0 ? "No hay cuentas abiertas. Crea una para empezar." : "Selecciona una mesa para añadir productos."}
             </p>
             <Button variant="outline" onClick={() => setShowNewTab(true)}>
-              <PlusCircle className="w-4 h-4 mr-2" /> Open New Tab
+              <PlusCircle className="w-4 h-4 mr-2" /> Abrir Nueva Mesa
             </Button>
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* Menu area */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex gap-2 p-3 overflow-x-auto border-b border-border/30">
@@ -163,11 +181,10 @@ const POS = () => {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeCategory === cat
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeCategory === cat
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
                 >
                   {cat}
                 </button>
@@ -179,7 +196,14 @@ const POS = () => {
                 {filteredItems.map((item) => (
                   <button
                     key={item.id}
-                    onClick={() => addItemToTab(activeTab.id, item)}
+                    onClick={() => {
+                      if (categoriesWithFillings.includes(item.category)) {
+                        setFillingItem(item);
+                        setActiveFilling("");
+                      } else {
+                        addItemToTab(activeTab.id, item);
+                      }
+                    }}
                     className="glass-card p-4 text-left hover:border-primary/50 transition-all active:scale-95"
                   >
                     <span className="text-3xl">{item.emoji}</span>
@@ -192,12 +216,12 @@ const POS = () => {
           </div>
 
           {/* Tab sidebar */}
-          <div className="w-80 border-l border-border/50 bg-card/30 flex flex-col">
+          <div className="w-full h-[45vh] lg:h-auto lg:w-80 lg:flex-none border-t lg:border-t-0 lg:border-l border-border/50 bg-card/30 flex flex-col">
             <div className="p-3 border-b border-border/30">
               <div className="flex items-center gap-2 mb-2">
                 <ShoppingCart className="w-5 h-5 text-primary" />
                 <span className="font-semibold">
-                  {activeTab.tableNumber ? `Table ${activeTab.tableNumber}` : activeTab.customerName || "Open Tab"}
+                  {activeTab.tableNumber ? `Mesa ${activeTab.tableNumber}` : activeTab.customerName || "Cuenta Abierta"}
                 </span>
                 <span className="ml-auto text-xs text-muted-foreground">
                   {activeTab.items.reduce((s, i) => s + i.quantity, 0)} items
@@ -205,13 +229,13 @@ const POS = () => {
               </div>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Table #"
+                  placeholder="Mesa #"
                   value={activeTab.tableNumber?.toString() || ""}
                   onChange={(e) => updateTab(activeTab.id, { tableNumber: e.target.value ? parseInt(e.target.value) : undefined })}
                   className="h-7 text-xs w-20"
                 />
                 <Input
-                  placeholder="Customer"
+                  placeholder="Cliente"
                   value={activeTab.customerName || ""}
                   onChange={(e) => updateTab(activeTab.id, { customerName: e.target.value || undefined })}
                   className="h-7 text-xs flex-1"
@@ -235,6 +259,7 @@ const POS = () => {
                       <span className="text-lg">{item.menuItem.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                        {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                         <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
                       </div>
                       <span className="text-sm text-muted-foreground w-6 text-center">×{item.quantity}</span>
@@ -251,30 +276,34 @@ const POS = () => {
                       <AlertCircle className="w-3 h-3" /> New — not sent yet
                     </p>
                   )}
-                  {unsentItems.map((item) => {
-                    const totalQty = activeTab.items.find((i) => i.menuItem.id === item.menuItem.id)!.quantity;
-                    const sentQty = getSentQty(item.menuItem.id);
+                  {unsentItems.map((item, idx) => {
+                    const totalQty = activeTab.items.find((i) =>
+                      i.menuItem.id === item.menuItem.id &&
+                      (i.notes || '') === (item.notes || '')
+                    )?.quantity || 0;
+                    const sentQty = getSentQty(item.menuItem.id, item.notes);
                     return (
-                      <div key={`unsent-${item.menuItem.id}`} className="flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/20 mb-1">
+                      <div key={`unsent-${item.menuItem.id}-${item.notes || idx}`} className="flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/20 mb-1">
                         <span className="text-lg">{item.menuItem.emoji}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                          {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                           <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1)}
+                            onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1, item.notes)}
                             className={`p-1 rounded hover:bg-muted ${totalQty <= sentQty ? "opacity-30 pointer-events-none" : ""}`}
                           >
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="text-sm w-6 text-center">{item.quantity}</span>
-                          <button onClick={() => addItemToTab(activeTab.id, item.menuItem)} className="p-1 rounded hover:bg-muted">
+                          <button onClick={() => addItemToTab(activeTab.id, item.menuItem, item.notes)} className="p-1 rounded hover:bg-muted">
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
                         <button
-                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -(item.quantity))}
+                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -(item.quantity), item.notes)}
                           className={`p-1 text-destructive hover:bg-destructive/10 rounded ${sentQty > 0 ? "opacity-30 pointer-events-none" : ""}`}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -336,7 +365,7 @@ const POS = () => {
 
           <div className="space-y-3">
             <p className="text-sm font-medium text-muted-foreground">Select Payment Method</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {([
                 { value: "cash" as PaymentMethod, label: "Cash", icon: <Banknote className="w-6 h-6" /> },
                 { value: "card" as PaymentMethod, label: "Card", icon: <CreditCard className="w-6 h-6" /> },
@@ -345,11 +374,10 @@ const POS = () => {
                 <button
                   key={pm.value}
                   onClick={() => setPaymentMethod(pm.value)}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-lg text-sm font-medium transition-all border ${
-                    paymentMethod === pm.value
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80"
-                  }`}
+                  className={`flex sm:flex-col items-center gap-2 p-4 rounded-lg text-sm font-medium transition-all border ${paymentMethod === pm.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80"
+                    }`}
                 >
                   {pm.icon}
                   {pm.label}
@@ -362,6 +390,125 @@ const POS = () => {
             <Button variant="outline" onClick={() => setPayDialogTabId(null)}>Cancel</Button>
             <Button onClick={handleCloseTab}>
               <Check className="w-4 h-4 mr-2" /> Confirm Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteDialogTabId} onOpenChange={(open) => !open && setDeleteDialogTabId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" /> ¿Eliminar esta mesa?
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción cerrará la mesa sin registrar formalmente un pago. Úsala solo para cancelaciones o errores.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <label className="text-sm font-medium">Motivo de la eliminación (Opcional)</label>
+            <Input
+              placeholder="Ej: Cliente se fue molesto, error de digitación..."
+              value={deleteNote}
+              onChange={(e) => setDeleteNote(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogTabId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteTab}>
+              <Trash2 className="w-4 h-4 mr-2" /> Eliminar Mesa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Select Filling Dialog */}
+      <Dialog open={!!fillingItem} onOpenChange={(open) => !open && setFillingItem(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Seleccionar Guisado</DialogTitle>
+            <DialogDescription>
+              {activeFilling === "Mixta"
+                ? "Selecciona los ingredientes para la mezcla"
+                : `Escoge el guisado para ${fillingItem?.name}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeFilling === "Mixta" ? (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                {(fillingItem && fillingOptions[fillingItem.category] || [])
+                  .filter(opt => opt !== "Mixta")
+                  .map((opt) => {
+                    const isSelected = mixtureParts.includes(opt);
+                    return (
+                      <Button
+                        key={opt}
+                        variant={isSelected ? "default" : "outline"}
+                        className="h-12"
+                        onClick={() => {
+                          setMixtureParts(prev =>
+                            prev.includes(opt)
+                              ? prev.filter(p => p !== opt)
+                              : [...prev, opt]
+                          );
+                        }}
+                      >
+                        {opt}
+                      </Button>
+                    );
+                  })}
+              </div>
+              {mixtureParts.length > 0 && (
+                <p className="text-sm font-medium text-center text-primary">
+                  Mezcla: {mixtureParts.join(" con ")}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 py-4">
+              {(fillingItem && fillingOptions[fillingItem.category] || []).map((opt) => (
+                <Button
+                  key={opt}
+                  variant={activeFilling === opt ? "default" : "outline"}
+                  className="h-12"
+                  onClick={() => {
+                    setActiveFilling(opt);
+                    if (opt !== "Mixta") setMixtureParts([]);
+                  }}
+                >
+                  {opt}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setFillingItem(null);
+              setActiveFilling("");
+              setMixtureParts([]);
+            }}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!activeFilling || (activeFilling === "Mixta" && mixtureParts.length < 2)}
+              onClick={() => {
+                if (activeTabId && fillingItem) {
+                  const finalNote = activeFilling === "Mixta"
+                    ? `Mixta (${mixtureParts.join(" y ")})`
+                    : activeFilling;
+                  addItemToTab(activeTabId, fillingItem, finalNote);
+                  setFillingItem(null);
+                  setActiveFilling("");
+                  setMixtureParts([]);
+                }
+              }}
+            >
+              {activeFilling === "Mixta" ? "Confirmar Mezcla" : "Añadir a la Cuenta"}
             </Button>
           </DialogFooter>
         </DialogContent>

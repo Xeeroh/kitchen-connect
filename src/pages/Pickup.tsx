@@ -7,7 +7,7 @@ import { Package } from "lucide-react";
 const Pickup = () => {
   const { getOrdersByStatus, updateOrderStatus } = useOrders();
   const ready = getOrdersByStatus("ready");
-  const pickedUp = getOrdersByStatus("picked_up").slice(0, 10);
+  const pickedUp = getOrdersByStatus("served").slice(0, 10);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -36,7 +36,7 @@ const Pickup = () => {
                 key={order.id}
                 order={order}
                 nextLabel="Picked Up ✓"
-                onAdvance={() => updateOrderStatus(order.id, "picked_up")}
+                onAdvance={() => updateOrderStatus(order.id, "served")}
               />
             ))}
           </div>

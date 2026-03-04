@@ -9,10 +9,10 @@ const paymentIcons = {
 };
 
 const statusConfig: Record<OrderStatus, { label: string; class: string; icon: React.ReactNode }> = {
-  pending: { label: "New", class: "status-pending", icon: <Clock className="w-4 h-4" /> },
-  preparing: { label: "Preparing", class: "status-preparing", icon: <ChefHat className="w-4 h-4" /> },
+  pending: { label: "Cart", class: "status-pending", icon: <Clock className="w-4 h-4" /> },
+  sent: { label: "New", class: "status-pending", icon: <Clock className="w-4 h-4" /> },
   ready: { label: "Ready", class: "status-ready", icon: <Package className="w-4 h-4" /> },
-  picked_up: { label: "Done", class: "status-ready", icon: <Check className="w-4 h-4" /> },
+  served: { label: "Done", class: "status-ready", icon: <Check className="w-4 h-4" /> },
 };
 
 interface OrderCardProps {
@@ -30,27 +30,36 @@ const OrderCard = ({ order, nextStatus, nextLabel, onAdvance }: OrderCardProps) 
     <div className="glass-card p-4 animate-slide-in">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold font-heading text-primary">{order.id}</span>
-          {order.tableNumber && (
-            <span className="text-sm text-muted-foreground">Table {order.tableNumber}</span>
-          )}
+          <span className="text-xl font-bold font-heading text-primary">
+            {order.tableNumber ? `Mesa ${order.tableNumber}` : order.customerName || "Pedido"}
+          </span>
+          <span className="text-xs text-muted-foreground ml-2 opacity-50" title={order.id}>
+            #{order.id.slice(0, 4)}
+          </span>
         </div>
         <span className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 ${config.class}`}>
           {config.icon} {config.label}
         </span>
       </div>
 
-      {order.customerName && (
+      {order.customerName && order.tableNumber && (
         <p className="text-sm text-muted-foreground mb-2">{order.customerName}</p>
       )}
 
-      <div className="space-y-1 mb-3">
+      <div className="space-y-4 mb-3">
         {order.items.map((item, i) => (
-          <div key={i} className="flex justify-between text-sm">
-            <span>
-              {item.menuItem.emoji} {item.quantity}× {item.menuItem.name}
-            </span>
-            <span className="text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</span>
+          <div key={i} className="flex flex-col gap-1 border-b border-border/10 pb-2 last:border-0 last:pb-0">
+            <div className="flex justify-between text-sm items-start">
+              <span className="font-heading">
+                {item.menuItem.emoji} {item.quantity}× {item.menuItem.name}
+              </span>
+              <span className="text-muted-foreground text-[10px]">${(item.menuItem.price * item.quantity).toFixed(2)}</span>
+            </div>
+            {item.notes && (
+              <span className="text-[11px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-sm self-start">
+                Guarnicion: {item.notes}
+              </span>
+            )}
           </div>
         ))}
       </div>

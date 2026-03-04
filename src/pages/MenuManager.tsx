@@ -8,7 +8,7 @@ import { Plus, Pencil, Trash2, Save, X, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 const MenuManager = () => {
-  const { menu, setMenu } = useOrders();
+  const { menu, addMenuItem, updateMenuItem, deleteMenuItem } = useOrders();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", price: "", category: categories[0], emoji: "🍽️" });
@@ -28,12 +28,11 @@ const MenuManager = () => {
     const emoji = form.emoji.trim() || "🍽️";
 
     if (editingId) {
-      setMenu((prev) => prev.map((m) => m.id === editingId ? { ...m, name, price, category: form.category, emoji } : m));
-      toast.success("Item updated");
+      updateMenuItem(editingId, { name, price, category: form.category, emoji });
+      toast.success("Producto actualizado");
     } else {
-      const newItem: MenuItem = { id: crypto.randomUUID(), name, price, category: form.category, emoji };
-      setMenu((prev) => [...prev, newItem]);
-      toast.success("Item added");
+      addMenuItem({ name, price, category: form.category, emoji });
+      toast.success("Producto añadido");
     }
     resetForm();
   };
@@ -45,8 +44,8 @@ const MenuManager = () => {
   };
 
   const deleteItem = (id: string) => {
-    setMenu((prev) => prev.filter((m) => m.id !== id));
-    toast.success("Item deleted");
+    deleteMenuItem(id);
+    toast.success("Producto eliminado");
   };
 
   const filtered = filterCat === "All" ? menu : menu.filter((m) => m.category === filterCat);
@@ -56,10 +55,10 @@ const MenuManager = () => {
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-2">
           <Settings className="w-6 h-6 text-primary" />
-          <span className="text-xl font-bold text-primary font-heading">Menu Manager</span>
+          <span className="text-xl font-bold text-primary font-heading">Gestión del Menú</span>
         </div>
         <div className="flex gap-2">
-          <Link to="/"><Button variant="outline" size="sm">Home</Button></Link>
+          <Link to="/"><Button variant="outline" size="sm">Inicio</Button></Link>
           <Link to="/pos"><Button variant="outline" size="sm">POS</Button></Link>
         </div>
       </header>
@@ -68,10 +67,10 @@ const MenuManager = () => {
         {/* Add / Edit form */}
         {showAdd ? (
           <div className="glass-card p-4 space-y-3 animate-slide-in">
-            <h3 className="font-semibold">{editingId ? "Edit Item" : "New Item"}</h3>
+            <h3 className="font-semibold">{editingId ? "Editar Producto" : "Nuevo Producto"}</h3>
             <div className="grid grid-cols-2 gap-3">
-              <Input placeholder="Name" value={form.name} maxLength={100} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <Input placeholder="Price" type="number" step="0.01" min="0" max="9999" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+              <Input placeholder="Nombre" value={form.name} maxLength={100} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input placeholder="Precio" type="number" step="0.01" min="0" max="9999" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={form.category}
@@ -82,12 +81,12 @@ const MenuManager = () => {
               <Input placeholder="Emoji" value={form.emoji} maxLength={4} onChange={(e) => setForm({ ...form, emoji: e.target.value })} />
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleSave}><Save className="w-4 h-4 mr-1" />{editingId ? "Update" : "Add"}</Button>
-              <Button variant="outline" onClick={resetForm}><X className="w-4 h-4 mr-1" />Cancel</Button>
+              <Button onClick={handleSave}><Save className="w-4 h-4 mr-1" />{editingId ? "Actualizar" : "Añadir"}</Button>
+              <Button variant="outline" onClick={resetForm}><X className="w-4 h-4 mr-1" />Cancelar</Button>
             </div>
           </div>
         ) : (
-          <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" />Add Item</Button>
+          <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" />Añadir Producto</Button>
         )}
 
         {/* Filter */}
@@ -96,9 +95,8 @@ const MenuManager = () => {
             <button
               key={cat}
               onClick={() => setFilterCat(cat)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                filterCat === cat ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filterCat === cat ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
             >
               {cat}
             </button>
@@ -110,10 +108,10 @@ const MenuManager = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/50 text-muted-foreground">
-                <th className="text-left p-3">Item</th>
-                <th className="text-left p-3">Category</th>
-                <th className="text-right p-3">Price</th>
-                <th className="text-right p-3 w-24">Actions</th>
+                <th className="text-left p-3">Producto</th>
+                <th className="text-left p-3">Categoría</th>
+                <th className="text-right p-3">Precio</th>
+                <th className="text-right p-3 w-24">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -131,7 +129,7 @@ const MenuManager = () => {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No items</td></tr>
+                <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No hay productos en esta categoría</td></tr>
               )}
             </tbody>
           </table>

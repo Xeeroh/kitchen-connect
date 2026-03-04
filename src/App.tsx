@@ -10,6 +10,7 @@ import Kitchen from "./pages/Kitchen";
 import Pickup from "./pages/Pickup";
 import MenuManager from "./pages/MenuManager";
 import Accounting from "./pages/Accounting";
+import Checkout from "./pages/Checkout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/pos" element={<POS />} />
             <Route path="/kitchen" element={<Kitchen />} />
             <Route path="/pickup" element={<Pickup />} />
+            <Route path="/checkout" element={<Checkout />} />
             <Route path="/menu" element={<MenuManager />} />
             <Route path="/accounting" element={<Accounting />} />
             <Route path="*" element={<NotFound />} />

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useOrders } from "@/contexts/OrderContext";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft } from "lucide-react";
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft, Send } from "lucide-react";
 
 const Accounting = () => {
   const { orders } = useOrders();
@@ -14,8 +14,8 @@ const Accounting = () => {
       return d.toDateString() === today.toDateString();
     });
 
-    const completed = todayOrders.filter((o) => o.status === "picked_up");
-    const active = todayOrders.filter((o) => o.status !== "picked_up");
+    const completed = todayOrders.filter((o) => o.status === "served");
+    const active = todayOrders.filter((o) => o.status !== "served");
     const totalRevenue = completed.reduce((s, o) => s + o.total, 0);
     const pendingRevenue = active.reduce((s, o) => s + o.total, 0);
     const avgOrder = completed.length > 0 ? totalRevenue / completed.length : 0;
@@ -58,7 +58,7 @@ const Accounting = () => {
       <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/50">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-6 h-6 text-primary" />
-          <span className="text-xl font-bold text-primary font-heading">Daily Accounting</span>
+          <span className="text-xl font-bold text-primary font-heading">Contabilidad Diaria</span>
         </div>
         <div className="flex gap-2">
           <Link to="/"><Button variant="outline" size="sm">Home</Button></Link>
@@ -78,25 +78,25 @@ const Accounting = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="glass-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <DollarSign className="w-4 h-4" /> Revenue
+              <DollarSign className="w-4 h-4" /> Ganancias
             </div>
             <p className="text-2xl font-bold text-primary">${stats.totalRevenue.toFixed(2)}</p>
           </div>
           <div className="glass-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <CheckCircle className="w-4 h-4" /> Completed
+              <CheckCircle className="w-4 h-4" /> Completadas
             </div>
             <p className="text-2xl font-bold">{stats.completed.length}</p>
           </div>
           <div className="glass-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <TrendingUp className="w-4 h-4" /> Avg Order
+              <TrendingUp className="w-4 h-4" /> Ordenes Promedio
             </div>
             <p className="text-2xl font-bold">${stats.avgOrder.toFixed(2)}</p>
           </div>
           <div className="glass-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-              <Clock className="w-4 h-4" /> Pending $
+              <Clock className="w-4 h-4" /> Pendientes $
             </div>
             <p className="text-2xl font-bold text-warning">${stats.pendingRevenue.toFixed(2)}</p>
           </div>
@@ -113,7 +113,7 @@ const Accounting = () => {
                 <div>
                   <p className="text-xs text-muted-foreground capitalize">{pm}</p>
                   <p className="font-bold">${data.revenue.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">{data.count} orders</p>
+                  <p className="text-xs text-muted-foreground">{data.count} ordenes</p>
                 </div>
               </div>
             );
@@ -124,10 +124,10 @@ const Accounting = () => {
           {/* Top selling items */}
           <div className="glass-card p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4 text-primary" /> Top Items
+              <ShoppingCart className="w-4 h-4 text-primary" /> Más Vendidos
             </h3>
             {stats.topItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No completed orders yet</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay productos vendidos aún</p>
             ) : (
               <div className="space-y-2">
                 {stats.topItems.slice(0, 10).map((item, i) => (
@@ -146,10 +146,10 @@ const Accounting = () => {
           {/* Category breakdown */}
           <div className="glass-card p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <Package className="w-4 h-4 text-primary" /> By Category
+              <Package className="w-4 h-4 text-primary" /> Por Categorias
             </h3>
             {stats.categoryBreakdown.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No data yet</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">No hay productos vendidos aún</p>
             ) : (
               <div className="space-y-3">
                 {stats.categoryBreakdown.map(([cat, rev]) => {
@@ -174,37 +174,56 @@ const Accounting = () => {
         {/* Order history table */}
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b border-border/30">
-            <h3 className="font-semibold">All Orders Today ({stats.todayOrders.length})</h3>
+            <h3 className="font-semibold">Todas las Ordenes de Hoy ({stats.todayOrders.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/50 text-muted-foreground">
-                  <th className="text-left p-3">Order</th>
-                  <th className="text-left p-3">Time</th>
+                  <th className="text-left p-3">Orden</th>
+                  <th className="text-left p-3">Hora</th>
                   <th className="text-left p-3">Items</th>
-                  <th className="text-left p-3">Status</th>
+                  <th className="text-left p-3">Pago</th>
+                  <th className="text-left p-3">Estado</th>
                   <th className="text-right p-3">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.todayOrders.length === 0 && (
-                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No orders today</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No hay ordenes hoy</td></tr>
                 )}
                 {stats.todayOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
-                    <td className="p-3 font-medium text-primary">{order.id}</td>
-                    <td className="p-3 text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td className="p-3">{order.items.map((i) => `${i.quantity}× ${i.menuItem.name}`).join(", ")}</td>
                     <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        order.status === "picked_up" ? "status-ready" :
+                      <div className="flex flex-col">
+                        <span className="font-medium text-primary">
+                          {order.tableNumber ? `Mesa ${order.tableNumber}` : order.customerName || "Pedido"}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground opacity-50">#{order.id.slice(-4)}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 text-muted-foreground">
+                      {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="p-3 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">
+                      {order.items.map((i) => `${i.quantity}× ${i.menuItem.name}`).join(", ")}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {order.paymentMethod === 'cash' && <><DollarSign className="w-3 h-3 text-emerald-500" /> Efectivo</>}
+                        {order.paymentMethod === 'card' && <><CreditCard className="w-3 h-3 text-blue-500" /> Tarjeta</>}
+                        {order.paymentMethod === 'transfer' && <><Send className="w-3 h-3 text-purple-500" /> Transf.</>}
+                        {!order.paymentMethod && <span className="text-muted-foreground italic">N/A</span>}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${order.status === "served" ? "status-ready" :
                         order.status === "ready" ? "status-ready" :
-                        order.status === "preparing" ? "status-preparing" : "status-pending"
-                      }`}>
-                        {order.status.replace("_", " ")}
+                          order.status === "sent" ? "status-preparing" : "status-pending"
+                        }`}>
+                        {order.status === "served" ? "Cerrada" :
+                          order.status === "ready" ? "Listo" :
+                            order.status === "sent" ? "En Cocina" : "Pendiente"}
                       </span>
                     </td>
                     <td className="p-3 text-right font-semibold">${order.total.toFixed(2)}</td>

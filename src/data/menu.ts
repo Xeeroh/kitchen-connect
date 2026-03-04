@@ -4,6 +4,7 @@ export interface MenuItem {
   price: number;
   category: string;
   emoji: string;
+  hasFillings?: boolean;
 }
 
 export interface OrderItem {
@@ -14,7 +15,7 @@ export interface OrderItem {
 
 export type PaymentMethod = "cash" | "card" | "transfer";
 
-export type OrderStatus = "pending" | "preparing" | "ready" | "picked_up";
+export type OrderStatus = "pending" | "sent" | "ready" | "served";
 
 export interface Tab {
   id: string;
@@ -22,6 +23,7 @@ export interface Tab {
   sentItems: OrderItem[];    // items already sent to kitchen
   total: number;
   createdAt: Date;
+  status: 'open' | 'closed';
   tableNumber?: number;
   customerName?: string;
 }
@@ -38,7 +40,7 @@ export interface Order {
   tabId?: string;
 }
 
-export const categories = ["Starters", "Mains", "Sides", "Drinks", "Desserts"];
+export const categories = ["Flautas", "Tostadas", "Sopes", "Enchiladas", "Quesadillas", "Pozoles", "Tacos", "Bebidas", "Postres"];
 
 export const defaultMenu: MenuItem[] = [
   { id: "1", name: "Bruschetta", price: 8.5, category: "Starters", emoji: "🍞" },
