@@ -26,6 +26,7 @@ export interface Tab {
   status: 'open' | 'closed';
   tableNumber?: number;
   customerName?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface Order {

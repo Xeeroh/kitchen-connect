@@ -210,7 +210,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         createdAt: new Date(dbTab.created_at),
         status: dbTab.status,
         tableNumber: dbTab.table_number || undefined,
-        customerName: dbTab.customer_name || undefined
+        customerName: dbTab.customer_name || undefined,
+        paymentMethod: dbTab.payment_method as PaymentMethod || undefined
       };
     }).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }, [dbTabs, dbTabItems, menu]);
@@ -227,7 +228,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!menuItem) return;
 
       const tab = dbTabs.find(t => t.id === dbItem.tab_id);
-      if (!tab || tab.status !== 'open') return;
+      if (!tab) return;
 
       // Group by tab_id + exactly identical timestamp created_at = unique dispatch to kitchen
       const orderId = `${dbItem.tab_id}_${new Date(dbItem.created_at).getTime()}`;

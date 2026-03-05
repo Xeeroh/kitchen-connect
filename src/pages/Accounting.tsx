@@ -5,10 +5,22 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft, Send } from "lucide-react";
 
 const Accounting = () => {
-  const { orders } = useOrders();
+  const { orders, tabs } = useOrders();
 
   const stats = useMemo(() => {
     const today = new Date();
+    const todayTabs = tabs.filter((t) => {
+      const d = new Date(t.createdAt);
+      return d.toDateString() === today.toDateString();
+    });
+
+    const completedTabs = todayTabs.filter((t) => t.status === "closed");
+    const openTabs = todayTabs.filter((t) => t.status === "open");
+
+    const totalRevenue = completedTabs.reduce((s, t) => s + t.total, 0);
+    const pendingRevenue = openTabs.reduce((s, t) => s + t.total, 0);
+    const avgOrder = completedTabs.length > 0 ? totalRevenue / completedTabs.length : 0;
+
     const todayOrders = orders.filter((o) => {
       const d = new Date(o.createdAt);
       return d.toDateString() === today.toDateString();
@@ -16,14 +28,11 @@ const Accounting = () => {
 
     const completed = todayOrders.filter((o) => o.status === "served");
     const active = todayOrders.filter((o) => o.status !== "served");
-    const totalRevenue = completed.reduce((s, o) => s + o.total, 0);
-    const pendingRevenue = active.reduce((s, o) => s + o.total, 0);
-    const avgOrder = completed.length > 0 ? totalRevenue / completed.length : 0;
 
-    // Item breakdown
+    // Item breakdown (Using all items from completed tabs for accuracy)
     const itemCounts: Record<string, { name: string; qty: number; revenue: number; emoji: string }> = {};
-    completed.forEach((o) =>
-      o.items.forEach((item) => {
+    completedTabs.forEach((t) =>
+      t.items.forEach((item) => {
         const key = item.menuItem.id;
         if (!itemCounts[key]) itemCounts[key] = { name: item.menuItem.name, qty: 0, revenue: 0, emoji: item.menuItem.emoji };
         itemCounts[key].qty += item.quantity;
@@ -34,8 +43,8 @@ const Accounting = () => {
 
     // Category breakdown
     const catRevenue: Record<string, number> = {};
-    completed.forEach((o) =>
-      o.items.forEach((item) => {
+    completedTabs.forEach((t) =>
+      t.items.forEach((item) => {
         catRevenue[item.menuItem.category] = (catRevenue[item.menuItem.category] || 0) + item.menuItem.price * item.quantity;
       })
     );
@@ -43,15 +52,15 @@ const Accounting = () => {
 
     // Payment method breakdown
     const paymentBreakdown: Record<string, { count: number; revenue: number }> = {};
-    completed.forEach((o) => {
-      const pm = o.paymentMethod || "cash";
+    completedTabs.forEach((t) => {
+      const pm = t.paymentMethod || "cash";
       if (!paymentBreakdown[pm]) paymentBreakdown[pm] = { count: 0, revenue: 0 };
       paymentBreakdown[pm].count++;
-      paymentBreakdown[pm].revenue += o.total;
+      paymentBreakdown[pm].revenue += t.total;
     });
 
     return { todayOrders, completed, active, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
-  }, [orders]);
+  }, [orders, tabs]);
 
   return (
     <div className="min-h-screen flex flex-col">
