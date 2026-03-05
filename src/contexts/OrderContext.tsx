@@ -216,45 +216,61 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }, [dbTabs, dbTabItems, menu]);
 
-  // DERIVE `orders` for KITCHEN from dbTabItems grouped by timestamp
+  // DERIVE `orders` for KITCHEN from dbTabItems grouped by timestamp with Smart Pricing
   const orders: Order[] = useMemo(() => {
-    const ordersMap: Record<string, Order> = {};
-
-    // Only map items that are sent, ready, or served (Kitchen & Pickup look at these)
-    dbTabItems.forEach(dbItem => {
-      if (dbItem.status === 'pending') return;
-
-      const menuItem = menu.find(m => m.id === dbItem.menu_item_id);
-      if (!menuItem) return;
-
-      const tab = dbTabs.find(t => t.id === dbItem.tab_id);
-      if (!tab) return;
-
-      // Group by tab_id + exactly identical timestamp created_at = unique dispatch to kitchen
-      const orderId = `${dbItem.tab_id}_${new Date(dbItem.created_at).getTime()}`;
-
-      if (!ordersMap[orderId]) {
-        ordersMap[orderId] = {
-          id: orderId,
-          items: [],
-          total: 0,
-          status: dbItem.status as OrderStatus,
-          createdAt: new Date(dbItem.created_at),
-          tableNumber: tab?.table_number || undefined,
-          customerName: tab?.customer_name || undefined,
-          paymentMethod: (tab?.payment_method as PaymentMethod) || 'cash',
-          tabId: dbItem.tab_id
-        };
-      }
-
-      ordersMap[orderId].items.push({ menuItem, quantity: dbItem.quantity, notes: dbItem.notes || undefined });
-      ordersMap[orderId].total += (menuItem.price * dbItem.quantity);
-      // Let the newest item define the overall worst-case status, though they should be identical
+    const itemsByTab: Record<string, DBTabItem[]> = {};
+    dbTabItems.forEach(i => {
+      if (i.status === 'pending') return;
+      if (!itemsByTab[i.tab_id]) itemsByTab[i.tab_id] = [];
+      itemsByTab[i.tab_id].push(i);
     });
 
-    return Object.values(ordersMap).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Newest first
-  }, [dbTabItems, dbTabs, menu]);
+    const results: Order[] = [];
 
+    Object.entries(itemsByTab).forEach(([tabId, dbItems]) => {
+      const tab = dbTabs.find(t => t.id === tabId);
+      if (!tab) return;
+
+      // Group by timestamp
+      const timestampGroups: Record<number, DBTabItem[]> = {};
+      dbItems.forEach(i => {
+        const ts = new Date(i.created_at).getTime();
+        if (!timestampGroups[ts]) timestampGroups[ts] = [];
+        timestampGroups[ts].push(i);
+      });
+
+      const sortedTimestamps = Object.keys(timestampGroups).map(Number).sort((a, b) => a - b);
+      let cumulativeOrderItems: OrderItem[] = [];
+      let lastTotal = 0;
+
+      sortedTimestamps.forEach(ts => {
+        const groupDbItems = timestampGroups[ts];
+        const groupOrderItems: OrderItem[] = groupDbItems.map(di => {
+          const mi = menu.find(m => m.id === di.menu_item_id)!;
+          return { menuItem: mi, quantity: di.quantity, notes: di.notes || undefined };
+        });
+
+        cumulativeOrderItems = [...cumulativeOrderItems, ...groupOrderItems];
+        const currentTotal = recalcTotal(cumulativeOrderItems);
+        const marginalPrice = currentTotal - lastTotal;
+        lastTotal = currentTotal;
+
+        results.push({
+          id: `${tabId}_${ts}`,
+          items: groupOrderItems,
+          total: marginalPrice,
+          status: groupDbItems[0].status as OrderStatus,
+          createdAt: new Date(ts),
+          tableNumber: tab.table_number || undefined,
+          customerName: tab.customer_name || undefined,
+          paymentMethod: (tab.payment_method as PaymentMethod) || 'cash',
+          tabId: tabId
+        });
+      });
+    });
+
+    return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [dbTabItems, dbTabs, menu]);
 
   // ACTIONS
   const openTab = useCallback(async (tableNumber?: number, customerName?: string) => {

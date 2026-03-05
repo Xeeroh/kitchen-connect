@@ -59,7 +59,7 @@ const Accounting = () => {
       paymentBreakdown[pm].revenue += t.total;
     });
 
-    return { todayOrders, completed, active, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
+    return { todayTabs, completedTabs, openTabs, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
   }, [orders, tabs]);
 
   return (
@@ -95,7 +95,7 @@ const Accounting = () => {
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <CheckCircle className="w-4 h-4" /> Completadas
             </div>
-            <p className="text-2xl font-bold">{stats.completed.length}</p>
+            <p className="text-2xl font-bold">{stats.completedTabs.length}</p>
           </div>
           <div className="glass-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -180,62 +180,56 @@ const Accounting = () => {
           </div>
         </div>
 
-        {/* Order history table */}
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b border-border/30">
-            <h3 className="font-semibold">Todas las Ordenes de Hoy ({stats.todayOrders.length})</h3>
+            <h3 className="font-semibold">Historial de Cuentas de Hoy ({stats.todayTabs.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/50 text-muted-foreground">
-                  <th className="text-left p-3">Orden</th>
+                  <th className="text-left p-3">Cuenta</th>
                   <th className="text-left p-3">Hora</th>
-                  <th className="text-left p-3">Items</th>
+                  <th className="text-left p-3">Consumo</th>
                   <th className="text-left p-3">Pago</th>
                   <th className="text-left p-3">Estado</th>
                   <th className="text-right p-3">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {stats.todayOrders.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No hay ordenes hoy</td></tr>
+                {stats.todayTabs.length === 0 && (
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No hay cuentas hoy</td></tr>
                 )}
-                {stats.todayOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
+                {[...stats.todayTabs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((tab) => (
+                  <tr key={tab.id} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
                     <td className="p-3">
                       <div className="flex flex-col">
                         <span className="font-medium text-primary">
-                          {order.tableNumber ? `Mesa ${order.tableNumber}` : order.customerName || "Pedido"}
+                          {tab.tableNumber ? `Mesa ${tab.tableNumber}` : tab.customerName || "Venta Directa"}
                         </span>
-                        <span className="text-[10px] text-muted-foreground opacity-50">#{order.id.slice(-4)}</span>
+                        <span className="text-[10px] text-muted-foreground opacity-50">#{tab.id.slice(-4)}</span>
                       </div>
                     </td>
                     <td className="p-3 text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(tab.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
                     </td>
                     <td className="p-3 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">
-                      {order.items.map((i) => `${i.quantity}× ${i.menuItem.name}`).join(", ")}
+                      {tab.items.map((i) => `${i.quantity}× ${i.menuItem.name}`).join(", ")}
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {order.paymentMethod === 'cash' && <><DollarSign className="w-3 h-3 text-emerald-500" /> Efectivo</>}
-                        {order.paymentMethod === 'card' && <><CreditCard className="w-3 h-3 text-blue-500" /> Tarjeta</>}
-                        {order.paymentMethod === 'transfer' && <><Send className="w-3 h-3 text-purple-500" /> Transf.</>}
-                        {!order.paymentMethod && <span className="text-muted-foreground italic">N/A</span>}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {tab.paymentMethod === 'cash' && <><DollarSign className="w-3 h-3 text-emerald-500" /> Efectivo</>}
+                        {tab.paymentMethod === 'card' && <><CreditCard className="w-3 h-3 text-blue-500" /> Tarjeta</>}
+                        {tab.paymentMethod === 'transfer' && <><Send className="w-3 h-3 text-purple-500" /> Transf.</>}
+                        {!tab.paymentMethod && <span className="italic">Pnd.</span>}
                       </div>
                     </td>
                     <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${order.status === "served" ? "status-ready" :
-                        order.status === "ready" ? "status-ready" :
-                          order.status === "sent" ? "status-preparing" : "status-pending"
-                        }`}>
-                        {order.status === "served" ? "Cerrada" :
-                          order.status === "ready" ? "Listo" :
-                            order.status === "sent" ? "En Cocina" : "Pendiente"}
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${tab.status === "closed" ? "status-ready" : "status-pending"}`}>
+                        {tab.status === "closed" ? "Pagada" : "Abierta"}
                       </span>
                     </td>
-                    <td className="p-3 text-right font-semibold">${order.total.toFixed(2)}</td>
+                    <td className="p-3 text-right font-semibold">${tab.total.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
