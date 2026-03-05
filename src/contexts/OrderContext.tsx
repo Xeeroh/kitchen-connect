@@ -71,57 +71,46 @@ const recalcTotal = (items: OrderItem[]) => {
   let grandTotal = 0;
 
   Object.values(itemsBySeat).forEach(seatItems => {
-    let seatTotal = 0;
-    const pieceCounts: Record<string, number> = {};
+    let seatOtherTotal = 0;
+    const seatPieceCounts: Record<string, number> = {};
 
     seatItems.forEach(item => {
       const name = item.menuItem.name;
-      let bundleSize = 0;
+      let multiplier = 1;
+      let normalizedBase = name;
 
-      if (name.includes("(Orden de 3)")) bundleSize = 3;
-      else if (name.includes("(Orden de 4)")) bundleSize = 4;
-      else if (name.includes("(Orden de 6)")) bundleSize = 6;
+      // Identify if it's already a bundle to count total units/pieces
+      if (name.includes("(Orden de 3)")) { multiplier = 3; normalizedBase = name.split(" (")[0]; }
+      else if (name.includes("(Orden de 4)")) { multiplier = 4; normalizedBase = name.split(" (")[0]; }
+      else if (name.includes("(Orden de 6)")) { multiplier = 6; normalizedBase = name.split(" (")[0]; }
 
-      if (bundleSize > 0) {
-        const normalizedBase = name.split(" (")[0]
-          .replace("Flautas", "Flauta Pieza")
-          .replace("Enchiladas", "Enchilada pieza")
-          .replace("Tacos dorado", "Taco Dorado pieza")
-          .replace("Sopes Sencillos", "Sope Sencillo (Pieza)")
-          .replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)");
+      const ruleKey = normalizedBase
+        .replace("Flautas", "Flauta Pieza")
+        .replace("Enchiladas", "Enchilada pieza")
+        .replace("Tacos dorado", "Taco Dorado pieza")
+        .replace("Sopes Sencillos", "Sope Sencillo (Pieza)")
+        .replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)");
 
-        const rule = Object.entries(bundleRules).find(([k]) =>
-          k.toLowerCase() === normalizedBase.toLowerCase() ||
-          k.toLowerCase().startsWith(normalizedBase.toLowerCase().split(' ')[0])
-        );
+      const ruleEntry = Object.entries(bundleRules).find(([k]) =>
+        k.toLowerCase() === ruleKey.toLowerCase() ||
+        k.toLowerCase().startsWith(ruleKey.toLowerCase().split(' ')[0])
+      );
 
-        if (rule && rule[1].bundles[bundleSize]) {
-          seatTotal += rule[1].bundles[bundleSize] * item.quantity;
-        } else {
-          seatTotal += item.menuItem.price * item.quantity;
-        }
+      if (ruleEntry) {
+        seatPieceCounts[ruleEntry[0]] = (seatPieceCounts[ruleEntry[0]] || 0) + (item.quantity * multiplier);
       } else {
-        const rule = Object.entries(bundleRules).find(([k]) =>
-          k.toLowerCase() === name.toLowerCase() ||
-          k.toLowerCase().startsWith(name.toLowerCase().split(' ')[0])
-        );
-
-        if (rule) {
-          pieceCounts[rule[0]] = (pieceCounts[rule[0]] || 0) + item.quantity;
-        } else {
-          seatTotal += item.menuItem.price * item.quantity;
-        }
+        seatOtherTotal += item.menuItem.price * item.quantity;
       }
     });
 
-    Object.entries(pieceCounts).forEach(([name, qty]) => {
+    // Apply smart pricing to the total accumulated units of this seat
+    let seatBundleTotal = 0;
+    Object.entries(seatPieceCounts).forEach(([name, qty]) => {
       const rule = bundleRules[name];
-      const autoBundles: Record<number, number> = {};
-      if (rule.bundles[3]) autoBundles[3] = rule.bundles[3];
-      seatTotal += calculateSmartPrice(qty, rule.piecePrice, autoBundles);
+      seatBundleTotal += calculateSmartPrice(qty, rule.piecePrice, rule.bundles);
     });
 
-    grandTotal += seatTotal;
+    grandTotal += seatOtherTotal + seatBundleTotal;
   });
 
   return grandTotal;
@@ -130,7 +119,7 @@ const recalcTotal = (items: OrderItem[]) => {
 const diffItems = (all: OrderItem[], sent: OrderItem[]): OrderItem[] => {
   const result: OrderItem[] = [];
   for (const item of all) {
-    // We must match on BOTH ID and exact notes
+    // We must match on BOTH ID and exact notes and SEAT
     const sentItem = sent.find((s) =>
       s.menuItem.id === item.menuItem.id &&
       (s.notes || '') === (item.notes || '') &&
@@ -464,7 +453,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateOrderStatus = useCallback(async (orderId: string, status: OrderStatus) => {
     // orderId looks like "tabId_milliseconds". We need to find all items matching this.
-    // The safest is finding items that construct this exact orderId.
     const itemsToUpdate = dbTabItems.filter(i => `${i.tab_id}_${new Date(i.created_at).getTime()}` === orderId);
     const ids = itemsToUpdate.map(i => i.id);
     if (ids.length > 0) {
