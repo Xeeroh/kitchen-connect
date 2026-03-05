@@ -60,35 +60,68 @@ const recalcTotal = (items: OrderItem[]) => {
     "Sope de Chicharrón (Pieza)": { piecePrice: 50, bundles: { 3: 125 } }
   };
 
-  const counts: Record<string, number> = {};
-  let otherTotal = 0;
+  let total = 0;
+  const pieceCounts: Record<string, number> = {};
 
   items.forEach(item => {
     const name = item.menuItem.name;
-    // Normalize name for lookup if it's already a bundle from previous messy data
+
+    // 1. Detect if it's an explicit bundle
+    let bundleSize = 0;
     let baseName = name;
-    let multiplier = 1;
 
-    if (name.includes("(Orden de 3)")) { multiplier = 3; baseName = name.split(" (")[0].replace("Flautas", "Flauta Pieza").replace("Enchiladas", "Enchilada pieza").replace("Tacos dorado", "Taco Dorado pieza").replace("Sopes Sencillos", "Sope Sencillo (Pieza)").replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)"); }
-    else if (name.includes("(Orden de 4)")) { multiplier = 4; baseName = name.split(" (")[0].replace("Flautas", "Flauta Pieza").replace("Enchiladas", "Enchilada pieza").replace("Tacos dorado", "Taco Dorado pieza"); }
-    else if (name.includes("(Orden de 6)")) { multiplier = 6; baseName = name.split(" (")[0].replace("Flautas", "Flauta Pieza").replace("Enchiladas", "Enchilada pieza").replace("Tacos dorado", "Taco Dorado pieza"); }
+    if (name.includes("(Orden de 3)")) bundleSize = 3;
+    else if (name.includes("(Orden de 4)")) bundleSize = 4;
+    else if (name.includes("(Orden de 6)")) bundleSize = 6;
 
-    const rule = Object.entries(bundleRules).find(([k]) => k.toLowerCase() === baseName.toLowerCase() || k.toLowerCase().startsWith(baseName.toLowerCase().split(' ')[0]));
+    if (bundleSize > 0) {
+      // Normalize base name to find the rule price
+      const normalizedBase = name.split(" (")[0]
+        .replace("Flautas", "Flauta Pieza")
+        .replace("Enchiladas", "Enchilada pieza")
+        .replace("Tacos dorado", "Taco Dorado pieza")
+        .replace("Sopes Sencillos", "Sope Sencillo (Pieza)")
+        .replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)");
 
-    if (rule) {
-      counts[rule[0]] = (counts[rule[0]] || 0) + (item.quantity * multiplier);
+      const rule = Object.entries(bundleRules).find(([k]) =>
+        k.toLowerCase() === normalizedBase.toLowerCase() ||
+        k.toLowerCase().startsWith(normalizedBase.toLowerCase().split(' ')[0])
+      );
+
+      if (rule && rule[1].bundles[bundleSize]) {
+        // Calculate price for this specific bundle line item immediately
+        total += rule[1].bundles[bundleSize] * item.quantity;
+      } else {
+        total += item.menuItem.price * item.quantity;
+      }
     } else {
-      otherTotal += item.menuItem.price * item.quantity;
+      // 2. It's a "Pieza" or other item
+      const rule = Object.entries(bundleRules).find(([k]) =>
+        k.toLowerCase() === name.toLowerCase() ||
+        k.toLowerCase().startsWith(name.toLowerCase().split(' ')[0])
+      );
+
+      if (rule) {
+        pieceCounts[rule[0]] = (pieceCounts[rule[0]] || 0) + item.quantity;
+      } else {
+        total += item.menuItem.price * item.quantity;
+      }
     }
   });
 
-  let bundleTotal = 0;
-  Object.entries(counts).forEach(([name, qty]) => {
+  // 3. Apply automatic bundling ONLY for the individual pieces
+  // To avoid "upgrading" individual pieces to too-cheap bulk discounts (like the 6-pack),
+  // we only allow automatic bundling to use the standard "Order of 3" price.
+  // Larger discounts must be explicitly selected as their own menu items.
+  Object.entries(pieceCounts).forEach(([name, qty]) => {
     const rule = bundleRules[name];
-    bundleTotal += calculateSmartPrice(qty, rule.piecePrice, rule.bundles);
+    const autoBundles: Record<number, number> = {};
+    if (rule.bundles[3]) autoBundles[3] = rule.bundles[3];
+
+    total += calculateSmartPrice(qty, rule.piecePrice, autoBundles);
   });
 
-  return otherTotal + bundleTotal;
+  return total;
 };
 
 const diffItems = (all: OrderItem[], sent: OrderItem[]): OrderItem[] => {
