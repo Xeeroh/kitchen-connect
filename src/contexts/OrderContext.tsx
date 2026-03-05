@@ -133,7 +133,8 @@ const diffItems = (all: OrderItem[], sent: OrderItem[]): OrderItem[] => {
     // We must match on BOTH ID and exact notes
     const sentItem = sent.find((s) =>
       s.menuItem.id === item.menuItem.id &&
-      (s.notes || '') === (item.notes || '')
+      (s.notes || '') === (item.notes || '') &&
+      s.seat === item.seat
     );
     const sentQty = sentItem ? sentItem.quantity : 0;
     const diff = item.quantity - sentQty;
@@ -363,7 +364,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setDbTabItems(prev => prev.map(i => i.id === existingPending.id ? { ...i, quantity: i.quantity + 1 } : i));
       }
     } else {
-      const { data } = await supabase.from('tab_items').insert({
+      const { data, error } = await supabase.from('tab_items').insert({
         tab_id: tabId,
         menu_item_id: item.id,
         quantity: 1,
@@ -371,6 +372,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         notes: notes || null,
         seat_number: seat || null
       }).select().single();
+
+      if (error) {
+        console.error("Error adding item to tab:", error);
+        toast.error("Error al guardar: " + error.message);
+        return;
+      }
+
       if (data) {
         currentItem = data;
         setDbTabItems(prev => [...prev, data]);
