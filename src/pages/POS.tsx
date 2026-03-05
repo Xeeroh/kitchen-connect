@@ -24,6 +24,7 @@ const POS = () => {
   const [deleteDialogTabId, setDeleteDialogTabId] = useState<string | null>(null);
   const [deleteNote, setDeleteNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [selectedSeat, setSelectedSeat] = useState<number>(1);
 
   const [showNewTab, setShowNewTab] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState("");
@@ -95,11 +96,12 @@ const POS = () => {
   };
 
   // Check if an item has been sent (can't go below sent qty)
-  const getSentQty = (itemId: string, notes?: string) => {
+  const getSentQty = (itemId: string, notes?: string, seat?: number) => {
     if (!activeTab) return 0;
     const sent = activeTab.sentItems.find((s) =>
       s.menuItem.id === itemId &&
-      (s.notes || '') === (notes || '')
+      (s.notes || '') === (notes || '') &&
+      s.seat === seat
     );
     return sent ? sent.quantity : 0;
   };
@@ -176,6 +178,30 @@ const POS = () => {
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
           {/* Menu area */}
           <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Seat Selector */}
+            <div className="flex items-center gap-3 p-3 bg-secondary/20 border-b border-border/30">
+              <span className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                👥 Comensal:
+              </span>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5, 6].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => setSelectedSeat(num)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all border ${selectedSeat === num
+                      ? "bg-primary text-primary-foreground border-primary scale-110 shadow-lg"
+                      : "bg-background text-foreground border-border hover:bg-secondary/50"
+                      }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground ml-auto hidden sm:block italic">
+                Cualquier pieza agregada al <b>Comensal {selectedSeat}</b> se agrupará para su descuento.
+              </p>
+            </div>
+
             <div className="flex gap-2 p-3 overflow-x-auto border-b border-border/30">
               {categories.map((cat) => (
                 <button
@@ -201,7 +227,7 @@ const POS = () => {
                         setFillingItem(item);
                         setActiveFilling("");
                       } else {
-                        addItemToTab(activeTab.id, item);
+                        addItemToTab(activeTab.id, item, undefined, selectedSeat);
                       }
                     }}
                     className="glass-card p-4 text-left hover:border-primary/50 transition-all active:scale-95"
@@ -258,7 +284,10 @@ const POS = () => {
                     <div key={`sent-${item.menuItem.id}`} className="flex items-center gap-2 p-2 rounded-md bg-secondary/30 opacity-60 mb-1">
                       <span className="text-lg">{item.menuItem.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                          <span className="text-[9px] bg-primary/10 text-primary px-1 rounded font-bold">C{item.seat}</span>
+                        </div>
                         {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                         <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
                       </div>
@@ -279,31 +308,35 @@ const POS = () => {
                   {unsentItems.map((item, idx) => {
                     const totalQty = activeTab.items.find((i) =>
                       i.menuItem.id === item.menuItem.id &&
-                      (i.notes || '') === (item.notes || '')
+                      (i.notes || '') === (item.notes || '') &&
+                      i.seat === item.seat
                     )?.quantity || 0;
-                    const sentQty = getSentQty(item.menuItem.id, item.notes);
+                    const sentQty = getSentQty(item.menuItem.id, item.notes, item.seat);
                     return (
                       <div key={`unsent-${item.menuItem.id}-${item.notes || idx}`} className="flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/20 mb-1">
                         <span className="text-lg">{item.menuItem.emoji}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
+                            <span className="text-[9px] bg-warning/20 text-warning px-1 rounded font-bold border border-warning/30">C{item.seat}</span>
+                          </div>
                           {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                           <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1, item.notes)}
+                            onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1, item.notes, item.seat)}
                             className={`p-1 rounded hover:bg-muted ${totalQty <= sentQty ? "opacity-30 pointer-events-none" : ""}`}
                           >
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="text-sm w-6 text-center">{item.quantity}</span>
-                          <button onClick={() => addItemToTab(activeTab.id, item.menuItem, item.notes)} className="p-1 rounded hover:bg-muted">
+                          <button onClick={() => addItemToTab(activeTab.id, item.menuItem, item.notes, item.seat)} className="p-1 rounded hover:bg-muted">
                             <Plus className="w-3 h-3" />
                           </button>
                         </div>
                         <button
-                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -(item.quantity), item.notes)}
+                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -(item.quantity), item.notes, item.seat)}
                           className={`p-1 text-destructive hover:bg-destructive/10 rounded ${sentQty > 0 ? "opacity-30 pointer-events-none" : ""}`}
                         >
                           <Trash2 className="w-3 h-3" />
@@ -501,7 +534,7 @@ const POS = () => {
                   const finalNote = activeFilling === "Mixta"
                     ? `Mixta (${mixtureParts.join(" y ")})`
                     : activeFilling;
-                  addItemToTab(activeTabId, fillingItem, finalNote);
+                  addItemToTab(activeTabId, fillingItem, finalNote, selectedSeat);
                   setFillingItem(null);
                   setActiveFilling("");
                   setMixtureParts([]);

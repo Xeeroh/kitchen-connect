@@ -14,8 +14,8 @@ interface OrderContextType {
   menu: MenuItem[];
   setMenu: React.Dispatch<React.SetStateAction<MenuItem[]>>;
   openTab: (tableNumber?: number, customerName?: string) => Promise<string>;
-  addItemToTab: (tabId: string, item: MenuItem, notes?: string) => void;
-  updateTabItemQuantity: (tabId: string, itemId: string, delta: number, notes?: string) => void;
+  addItemToTab: (tabId: string, item: MenuItem, notes?: string, seat?: number) => void;
+  updateTabItemQuantity: (tabId: string, itemId: string, delta: number, notes?: string, seat?: number) => void;
   updateTab: (tabId: string, updates: Partial<Pick<Tab, "tableNumber" | "customerName">>) => void;
   sendToKitchen: (tabId: string) => Promise<void>;
   closeTab: (tabId: string, paymentMethod: PaymentMethod) => Promise<void>;
@@ -60,68 +60,71 @@ const recalcTotal = (items: OrderItem[]) => {
     "Sope de Chicharrón (Pieza)": { piecePrice: 50, bundles: { 3: 125 } }
   };
 
-  let total = 0;
-  const pieceCounts: Record<string, number> = {};
-
+  // Group items by SEAT to prevent bundling between different people
+  const itemsBySeat: Record<number, OrderItem[]> = {};
   items.forEach(item => {
-    const name = item.menuItem.name;
-
-    // 1. Detect if it's an explicit bundle
-    let bundleSize = 0;
-    let baseName = name;
-
-    if (name.includes("(Orden de 3)")) bundleSize = 3;
-    else if (name.includes("(Orden de 4)")) bundleSize = 4;
-    else if (name.includes("(Orden de 6)")) bundleSize = 6;
-
-    if (bundleSize > 0) {
-      // Normalize base name to find the rule price
-      const normalizedBase = name.split(" (")[0]
-        .replace("Flautas", "Flauta Pieza")
-        .replace("Enchiladas", "Enchilada pieza")
-        .replace("Tacos dorado", "Taco Dorado pieza")
-        .replace("Sopes Sencillos", "Sope Sencillo (Pieza)")
-        .replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)");
-
-      const rule = Object.entries(bundleRules).find(([k]) =>
-        k.toLowerCase() === normalizedBase.toLowerCase() ||
-        k.toLowerCase().startsWith(normalizedBase.toLowerCase().split(' ')[0])
-      );
-
-      if (rule && rule[1].bundles[bundleSize]) {
-        // Calculate price for this specific bundle line item immediately
-        total += rule[1].bundles[bundleSize] * item.quantity;
-      } else {
-        total += item.menuItem.price * item.quantity;
-      }
-    } else {
-      // 2. It's a "Pieza" or other item
-      const rule = Object.entries(bundleRules).find(([k]) =>
-        k.toLowerCase() === name.toLowerCase() ||
-        k.toLowerCase().startsWith(name.toLowerCase().split(' ')[0])
-      );
-
-      if (rule) {
-        pieceCounts[rule[0]] = (pieceCounts[rule[0]] || 0) + item.quantity;
-      } else {
-        total += item.menuItem.price * item.quantity;
-      }
-    }
+    const s = item.seat || 0;
+    if (!itemsBySeat[s]) itemsBySeat[s] = [];
+    itemsBySeat[s].push(item);
   });
 
-  // 3. Apply automatic bundling ONLY for the individual pieces
-  // To avoid "upgrading" individual pieces to too-cheap bulk discounts (like the 6-pack),
-  // we only allow automatic bundling to use the standard "Order of 3" price.
-  // Larger discounts must be explicitly selected as their own menu items.
-  Object.entries(pieceCounts).forEach(([name, qty]) => {
-    const rule = bundleRules[name];
-    const autoBundles: Record<number, number> = {};
-    if (rule.bundles[3]) autoBundles[3] = rule.bundles[3];
+  let grandTotal = 0;
 
-    total += calculateSmartPrice(qty, rule.piecePrice, autoBundles);
+  Object.values(itemsBySeat).forEach(seatItems => {
+    let seatTotal = 0;
+    const pieceCounts: Record<string, number> = {};
+
+    seatItems.forEach(item => {
+      const name = item.menuItem.name;
+      let bundleSize = 0;
+
+      if (name.includes("(Orden de 3)")) bundleSize = 3;
+      else if (name.includes("(Orden de 4)")) bundleSize = 4;
+      else if (name.includes("(Orden de 6)")) bundleSize = 6;
+
+      if (bundleSize > 0) {
+        const normalizedBase = name.split(" (")[0]
+          .replace("Flautas", "Flauta Pieza")
+          .replace("Enchiladas", "Enchilada pieza")
+          .replace("Tacos dorado", "Taco Dorado pieza")
+          .replace("Sopes Sencillos", "Sope Sencillo (Pieza)")
+          .replace("Sopes con Chicharrón", "Sope de Chicharrón (Pieza)");
+
+        const rule = Object.entries(bundleRules).find(([k]) =>
+          k.toLowerCase() === normalizedBase.toLowerCase() ||
+          k.toLowerCase().startsWith(normalizedBase.toLowerCase().split(' ')[0])
+        );
+
+        if (rule && rule[1].bundles[bundleSize]) {
+          seatTotal += rule[1].bundles[bundleSize] * item.quantity;
+        } else {
+          seatTotal += item.menuItem.price * item.quantity;
+        }
+      } else {
+        const rule = Object.entries(bundleRules).find(([k]) =>
+          k.toLowerCase() === name.toLowerCase() ||
+          k.toLowerCase().startsWith(name.toLowerCase().split(' ')[0])
+        );
+
+        if (rule) {
+          pieceCounts[rule[0]] = (pieceCounts[rule[0]] || 0) + item.quantity;
+        } else {
+          seatTotal += item.menuItem.price * item.quantity;
+        }
+      }
+    });
+
+    Object.entries(pieceCounts).forEach(([name, qty]) => {
+      const rule = bundleRules[name];
+      const autoBundles: Record<number, number> = {};
+      if (rule.bundles[3]) autoBundles[3] = rule.bundles[3];
+      seatTotal += calculateSmartPrice(qty, rule.piecePrice, autoBundles);
+    });
+
+    grandTotal += seatTotal;
   });
 
-  return total;
+  return grandTotal;
 };
 
 const diffItems = (all: OrderItem[], sent: OrderItem[]): OrderItem[] => {
@@ -217,20 +220,28 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!menuItem) return;
 
         // Total Items logic (Pending + Sent + Ready + Served)
-        const existingAll = mergedItems.find(i => i.menuItem.id === menuItem.id && (i.notes || '') === (dbItem.notes || ''));
+        const existingAll = mergedItems.find(i =>
+          i.menuItem.id === menuItem.id &&
+          (i.notes || '') === (dbItem.notes || '') &&
+          i.seat === (dbItem.seat_number || undefined)
+        );
         if (existingAll) {
           existingAll.quantity += dbItem.quantity;
         } else {
-          mergedItems.push({ menuItem, quantity: dbItem.quantity, notes: dbItem.notes || undefined });
+          mergedItems.push({ menuItem, quantity: dbItem.quantity, notes: dbItem.notes || undefined, seat: dbItem.seat_number || undefined });
         }
 
         // Sent Items logic (Sent + Ready + Served)
         if (dbItem.status !== 'pending') {
-          const existingSent = mergedSentItems.find(i => i.menuItem.id === menuItem.id && (i.notes || '') === (dbItem.notes || ''));
+          const existingSent = mergedSentItems.find(i =>
+            i.menuItem.id === menuItem.id &&
+            (i.notes || '') === (dbItem.notes || '') &&
+            i.seat === (dbItem.seat_number || undefined)
+          );
           if (existingSent) {
             existingSent.quantity += dbItem.quantity;
           } else {
-            mergedSentItems.push({ menuItem, quantity: dbItem.quantity, notes: dbItem.notes || undefined });
+            mergedSentItems.push({ menuItem, quantity: dbItem.quantity, notes: dbItem.notes || undefined, seat: dbItem.seat_number || undefined });
           }
         }
       });
@@ -279,8 +290,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sortedTimestamps.forEach(ts => {
         const groupDbItems = timestampGroups[ts];
         const groupOrderItems: OrderItem[] = groupDbItems.map(di => {
-          const mi = menu.find(m => m.id === di.menu_item_id)!;
-          return { menuItem: mi, quantity: di.quantity, notes: di.notes || undefined };
+          const mi = menu.find(m => m.id === di.menu_item_id);
+          return { menuItem: mi!, quantity: di.quantity, notes: di.notes || undefined, seat: di.seat_number || undefined };
         });
 
         cumulativeOrderItems = [...cumulativeOrderItems, ...groupOrderItems];
@@ -333,13 +344,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return '';
   }, [dbTabs]);
 
-  const addItemToTab = useCallback(async (tabId: string, item: MenuItem, notes?: string) => {
+  const addItemToTab = useCallback(async (tabId: string, item: MenuItem, notes?: string, seat?: number) => {
     // 1. Initial Insert/Update
     const existingPending = dbTabItems.find(i =>
       i.tab_id === tabId &&
       i.menu_item_id === item.id &&
       i.status === 'pending' &&
-      (i.notes || '') === (notes || '')
+      (i.notes || '') === (notes || '') &&
+      (i.seat_number || undefined) === seat
     );
 
     let currentItem: DBTabItem | null = null;
@@ -356,7 +368,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         menu_item_id: item.id,
         quantity: 1,
         status: 'pending',
-        notes: notes || null
+        notes: notes || null,
+        seat_number: seat || null
       }).select().single();
       if (data) {
         currentItem = data;
@@ -367,13 +380,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrderCounter(c => c + 1);
   }, [dbTabItems, menu]);
 
-  const updateTabItemQuantity = useCallback(async (tabId: string, itemId: string, delta: number, notes?: string) => {
+  const updateTabItemQuantity = useCallback(async (tabId: string, itemId: string, delta: number, notes?: string, seat?: number) => {
     // Only pending items can change quantity freely. Sent items are immutable from POS in this flow.
     const existingPending = dbTabItems.find(i =>
       i.tab_id === tabId &&
       i.menu_item_id === itemId &&
       i.status === 'pending' &&
-      (i.notes || '') === (notes || '')
+      (i.notes || '') === (notes || '') &&
+      (i.seat_number || undefined) === seat
     );
 
     if (existingPending) {

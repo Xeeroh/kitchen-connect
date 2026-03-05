@@ -76,6 +76,7 @@ export interface Database {
                     status: 'pending' | 'sent' | 'ready' | 'served'
                     created_at: string
                     notes: string | null
+                    seat_number: number | null
                 }
                 Insert: {
                     id?: string
@@ -84,6 +85,8 @@ export interface Database {
                     quantity: number
                     status?: 'pending' | 'sent' | 'ready' | 'served'
                     created_at?: string
+                    notes?: string | null
+                    seat_number?: number | null
                 }
                 Update: {
                     id?: string
@@ -92,6 +95,8 @@ export interface Database {
                     quantity?: number
                     status?: 'pending' | 'sent' | 'ready' | 'served'
                     created_at?: string
+                    notes?: string | null
+                    seat_number?: number | null
                 }
             }
         }

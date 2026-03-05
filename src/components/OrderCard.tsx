@@ -50,9 +50,16 @@ const OrderCard = ({ order, nextStatus, nextLabel, onAdvance }: OrderCardProps) 
         {order.items.map((item, i) => (
           <div key={i} className="flex flex-col gap-1 border-b border-border/10 pb-2 last:border-0 last:pb-0">
             <div className="flex justify-between text-sm items-start">
-              <span className="font-heading">
-                {item.menuItem.emoji} {item.quantity}× {item.menuItem.name}
-              </span>
+              <div className="flex flex-col">
+                <span className="font-heading">
+                  {item.menuItem.emoji} {item.quantity}× {item.menuItem.name}
+                </span>
+                {item.seat && (
+                  <span className="text-[9px] font-bold text-muted-foreground bg-secondary/30 px-1.5 py-0.5 rounded w-fit mt-0.5 uppercase tracking-tighter">
+                    Asiento {item.seat}
+                  </span>
+                )}
+              </div>
               <span className="text-muted-foreground text-[10px]">${(item.menuItem.price * item.quantity).toFixed(2)}</span>
             </div>
             {item.notes && (

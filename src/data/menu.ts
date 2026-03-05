@@ -11,6 +11,7 @@ export interface OrderItem {
   menuItem: MenuItem;
   quantity: number;
   notes?: string;
+  seat?: number;
 }
 
 export type PaymentMethod = "cash" | "card" | "transfer";
