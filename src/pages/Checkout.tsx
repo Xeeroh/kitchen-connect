@@ -119,9 +119,12 @@ const Checkout = () => {
                         </div>
                       ))}
                       <Separator className="my-2" />
-                      <div className="flex justify-between font-bold text-lg">
+                      <div className="flex justify-between items-baseline font-bold text-lg">
                         <span>Total a Pagar</span>
-                        <span>${selectedTab.total.toFixed(2)}</span>
+                        <div className="text-right">
+                          <span className="block">${selectedTab.total.toFixed(2)} MXN</span>
+                          <span className="text-xs text-muted-foreground font-normal">≈ ${(selectedTab.total / exchangeRate).toFixed(2)} USD</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -170,7 +173,14 @@ const Checkout = () => {
 
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-medium">Monto Recibido</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">Monto Recibido</h3>
+                          {paymentCurrency === 'USD' && (
+                            <span className="text-xs font-bold text-emerald-600 animate-pulse bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                              Total: US$ {(selectedTab.total / exchangeRate).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex bg-secondary/30 p-1 rounded-md border">
                           <button
                             onClick={() => setPaymentCurrency('MXN')}
