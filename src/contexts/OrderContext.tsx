@@ -27,6 +27,8 @@ interface OrderContextType {
   updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
   deleteMenuItem: (id: string) => Promise<void>;
   orderCounter: number; // No longer highly accurate for distributed but kept for UI compat
+  exchangeRate: number;
+  setExchangeRate: (rate: number) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -138,6 +140,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [dbMenu, setDbMenu] = useState<DBMenu[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orderCounter, setOrderCounter] = useState(1);
+  const [exchangeRate, setExchangeRateState] = useState<number>(() => {
+    const saved = localStorage.getItem("usdExchangeRate");
+    return saved ? parseFloat(saved) : 18.0; // Default fallback
+  });
+
+  const setExchangeRate = useCallback((rate: number) => {
+    setExchangeRateState(rate);
+    localStorage.setItem("usdExchangeRate", rate.toString());
+    toast.success("Tipo de cambio actualizado: $" + rate + " MXN");
+  }, []);
 
   // FETCH & SUBSCRIBE to Supabase Realtime
   useEffect(() => {
@@ -498,7 +510,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         openTab, addItemToTab, updateTabItemQuantity, updateTab,
         sendToKitchen, closeTab, deleteTab, getUnsentItems,
         updateOrderStatus, getOrdersByStatus, orderCounter,
-        addMenuItem, updateMenuItem, deleteMenuItem
+        addMenuItem, updateMenuItem, deleteMenuItem,
+        exchangeRate, setExchangeRate
       }}
     >
       {children}

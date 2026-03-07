@@ -8,7 +8,7 @@ import {
   PlusCircle, X, Receipt, Check, Send, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -18,9 +18,9 @@ const POS = () => {
     menu, tabs, openTab, addItemToTab, updateTabItemQuantity,
     updateTab, sendToKitchen, closeTab, deleteTab, getUnsentItems,
   } = useOrders();
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState(categories[0]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [payDialogTabId, setPayDialogTabId] = useState<string | null>(null);
   const [deleteDialogTabId, setDeleteDialogTabId] = useState<string | null>(null);
   const [deleteNote, setDeleteNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
@@ -46,7 +46,6 @@ const POS = () => {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const filteredItems = menu.filter((m) => m.category === activeCategory);
-  const payTab = tabs.find((t) => t.id === payDialogTabId);
   const unsentItems = activeTab ? getUnsentItems(activeTab) : [];
   const hasUnsent = unsentItems.length > 0;
 
@@ -68,17 +67,7 @@ const POS = () => {
     toast.success("Order sent to kitchen!");
   };
 
-  const handleCloseTab = () => {
-    if (!payDialogTabId) return;
-    closeTab(payDialogTabId, paymentMethod);
-    if (activeTabId === payDialogTabId) {
-      const remainingOpen = tabs.filter(t => t.id !== payDialogTabId && t.status === 'open');
-      setActiveTabId(remainingOpen.length > 0 ? remainingOpen[0].id : null);
-    }
-    setPayDialogTabId(null);
-    setPaymentMethod("cash");
-    toast.success("Tab closed & paid!");
-  };
+
 
   const handleDeleteTab = async () => {
     if (!deleteDialogTabId) return;
@@ -369,64 +358,17 @@ const POS = () => {
               <Button
                 className="w-full h-10"
                 variant="outline"
-                onClick={() => { setPaymentMethod("cash"); setPayDialogTabId(activeTab.id); }}
+                onClick={() => navigate(`/checkout?tabId=${activeTab.id}`)}
                 disabled={activeTab.items.length === 0}
               >
-                <Banknote className="w-4 h-4 mr-2" /> Close & Pay Tab
+                <Banknote className="w-4 h-4 mr-2" /> Cerrar Cuenta en Caja
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Payment dialog */}
-      <Dialog open={!!payDialogTabId} onOpenChange={(open) => !open && setPayDialogTabId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Close Tab & Pay</DialogTitle>
-            <DialogDescription>
-              {payTab && (
-                <>
-                  {payTab.tableNumber ? `Table ${payTab.tableNumber}` : payTab.customerName || "Tab"} — Total: <strong>${payTab.total.toFixed(2)}</strong>
-                  {getUnsentItems(payTab).length > 0 && (
-                    <span className="block text-warning text-xs mt-1">⚠ Unsent items will also be sent to kitchen</span>
-                  )}
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">Select Payment Method</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {([
-                { value: "cash" as PaymentMethod, label: "Cash", icon: <Banknote className="w-6 h-6" /> },
-                { value: "card" as PaymentMethod, label: "Card", icon: <CreditCard className="w-6 h-6" /> },
-                { value: "transfer" as PaymentMethod, label: "Transfer", icon: <ArrowRightLeft className="w-6 h-6" /> },
-              ]).map((pm) => (
-                <button
-                  key={pm.value}
-                  onClick={() => setPaymentMethod(pm.value)}
-                  className={`flex sm:flex-col items-center gap-2 p-4 rounded-lg text-sm font-medium transition-all border ${paymentMethod === pm.value
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80"
-                    }`}
-                >
-                  {pm.icon}
-                  {pm.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPayDialogTabId(null)}>Cancel</Button>
-            <Button onClick={handleCloseTab}>
-              <Check className="w-4 h-4 mr-2" /> Confirm Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteDialogTabId} onOpenChange={(open) => !open && setDeleteDialogTabId(null)}>

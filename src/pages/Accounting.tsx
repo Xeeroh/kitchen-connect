@@ -2,10 +2,11 @@ import { useMemo } from "react";
 import { useOrders } from "@/contexts/OrderContext";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft, Send } from "lucide-react";
+import { BarChart3, DollarSign, ShoppingCart, TrendingUp, Clock, CheckCircle, Package, Banknote, CreditCard, ArrowRightLeft, Send, Settings2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const Accounting = () => {
-  const { orders, tabs } = useOrders();
+  const { orders, tabs, exchangeRate, setExchangeRate } = useOrders();
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -81,6 +82,31 @@ const Accounting = () => {
           <p className="text-muted-foreground text-sm">
             {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
+        </div>
+
+        {/* Exchange Rate Setting */}
+        <div className="glass-card p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-primary/20 bg-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/20 rounded-lg">
+              <Settings2 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold">Configuración de Divisa</p>
+              <p className="text-xs text-muted-foreground">El cambio de las compras se dará siempre en pesos mexicanos.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-background p-1.5 rounded-md border border-input shadow-sm">
+            <span className="text-xs font-bold px-2 py-0.5 bg-secondary rounded text-muted-foreground mr-1">T.C.</span>
+            <span className="text-sm font-bold">1 USD = $</span>
+            <Input
+              type="number"
+              className="w-20 h-8 border-none focus-visible:ring-0 font-bold text-primary px-1 text-center"
+              value={exchangeRate}
+              onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+              step="0.01"
+            />
+            <span className="text-sm font-bold mr-2 text-muted-foreground">MXN</span>
+          </div>
         </div>
 
         {/* KPI cards */}
