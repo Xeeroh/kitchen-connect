@@ -42,7 +42,7 @@ export interface Order {
   tabId?: string;
 }
 
-export const categories = ["Flautas", "Tostadas", "Sopes", "Enchiladas", "Quesadillas", "Pozoles", "Tacos", "Bebidas", "Postres"];
+export const categories = ["Flautas", "Tostadas", "Sopes", "Enchiladas", "Quesadillas", "Caldos", "Tacos", "Bebidas", "Postres"];
 
 export const defaultMenu: MenuItem[] = [
   { id: "1", name: "Bruschetta", price: 8.5, category: "Starters", emoji: "🍞" },
