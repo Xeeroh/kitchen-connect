@@ -15,7 +15,8 @@ interface OrderContextType {
   setMenu: React.Dispatch<React.SetStateAction<MenuItem[]>>;
   openTab: (tableNumber?: number, customerName?: string) => Promise<string>;
   addItemToTab: (tabId: string, item: MenuItem, notes?: string, seat?: number) => void;
-  updateTabItemQuantity: (tabId: string, itemId: string, delta: number, notes?: string, seat?: number) => void;
+  updateTabItemQuantity: (tabId: string, itemId: string, delta: number, notes?: string, seat?: number, status?: OrderStatus) => Promise<void>;
+  updateTabItemNotes: (tabId: string, itemId: string, oldNotes: string | undefined, seat: number | undefined, status: OrderStatus, newNotes: string) => Promise<void>;
   updateTab: (tabId: string, updates: Partial<Pick<Tab, "tableNumber" | "customerName">>) => void;
   sendToKitchen: (tabId: string) => Promise<void>;
   closeTab: (tabId: string, paymentMethod: PaymentMethod) => Promise<void>;
@@ -29,6 +30,7 @@ interface OrderContextType {
   orderCounter: number; // No longer highly accurate for distributed but kept for UI compat
   exchangeRate: number;
   setExchangeRate: (rate: number) => void;
+  refreshData: () => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -162,12 +164,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const { data: tabsData } = await supabase.from('tabs').select('*').in('status', ['open', 'closed']);
       if (tabsData) {
         setDbTabs(tabsData);
-        // Fetch items for these tabs
-        if (tabsData.length > 0) {
-          const tabIds = tabsData.map(t => t.id);
-          const { data: itemsData } = await supabase.from('tab_items').select('*').in('tab_id', tabIds);
-          if (itemsData) setDbTabItems(itemsData);
-        }
+        // Fetch items for these tabs - fetch all for safety
+        const { data: itemsData } = await supabase.from('tab_items').select('*');
+        if (itemsData) setDbTabItems(itemsData);
       }
     };
 
@@ -176,22 +175,24 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Subscribe to Channels
     const menuChannel = supabase.channel('menu_items_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, () => {
-        supabase.from('menu_items').select('*').eq('is_available', true).then(({ data }) => setDbMenu(data || []));
+        supabase.from('menu_items').select('*').eq('is_available', true).then(({ data }) => {
+          if (data) setDbMenu(data);
+        });
       }).subscribe();
 
     const tabsChannel = supabase.channel('tabs_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tabs' }, () => {
-        supabase.from('tabs').select('*').in('status', ['open', 'closed']).then(({ data }) => setDbTabs(data || []));
+        supabase.from('tabs').select('*').in('status', ['open', 'closed']).then(({ data }) => {
+          if (data) setDbTabs(data);
+        });
       }).subscribe();
 
     const itemsChannel = supabase.channel('tab_items_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tab_items' }, () => {
-        const tabIds = dbTabs.map(t => t.id);
-        if (tabIds.length > 0) {
-          supabase.from('tab_items').select('*').in('tab_id', tabIds).then(({ data }) => setDbTabItems(data || []));
-        } else {
-          supabase.from('tab_items').select('*').then(({ data }) => setDbTabItems(data || []));
-        }
+        // Fetch all items for active tabs - we don't filter here to avoid race conditions with dbTabs
+        supabase.from('tab_items').select('*').then(({ data }) => {
+          if (data) setDbTabItems(data);
+        });
       }).subscribe();
 
     return () => {
@@ -199,7 +200,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       supabase.removeChannel(tabsChannel);
       supabase.removeChannel(itemsChannel);
     };
-  }, [dbTabs.length]); // re-bind list if root tabs change significantly, though a simpler generic fetch on any item change is safe
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    const { data: tabsData } = await supabase.from('tabs').select('*').in('status', ['open', 'closed']);
+    if (tabsData) setDbTabs(tabsData);
+    const { data: itemsData } = await supabase.from('tab_items').select('*');
+    if (itemsData) setDbTabItems(itemsData);
+    toast.success("Datos actualizados");
+  }, []);
 
   // Update local menu mapping
   useEffect(() => {
@@ -389,24 +398,57 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrderCounter(c => c + 1);
   }, [dbTabItems, menu]);
 
-  const updateTabItemQuantity = useCallback(async (tabId: string, itemId: string, delta: number, notes?: string, seat?: number) => {
-    // Only pending items can change quantity freely. Sent items are immutable from POS in this flow.
-    const existingPending = dbTabItems.find(i =>
+  const updateTabItemQuantity = useCallback(async (tabId: string, itemId: string, delta: number, notes?: string, seat?: number, status: OrderStatus = 'pending') => {
+    const existing = dbTabItems.find(i =>
       i.tab_id === tabId &&
       i.menu_item_id === itemId &&
-      i.status === 'pending' &&
+      i.status === status &&
       (i.notes || '') === (notes || '') &&
       (i.seat_number || undefined) === seat
     );
 
-    if (existingPending) {
-      const newQty = existingPending.quantity + delta;
+    if (existing) {
+      const newQty = existing.quantity + delta;
       if (newQty <= 0) {
-        await supabase.from('tab_items').delete().eq('id', existingPending.id);
-        setDbTabItems(prev => prev.filter(i => i.id !== existingPending.id));
+        await supabase.from('tab_items').delete().eq('id', existing.id);
+        setDbTabItems(prev => prev.filter(i => i.id !== existing.id));
       } else {
-        await supabase.from('tab_items').update({ quantity: newQty }).eq('id', existingPending.id);
-        setDbTabItems(prev => prev.map(i => i.id === existingPending.id ? { ...i, quantity: newQty } : i));
+        await (supabase.from('tab_items') as any).update({ quantity: newQty }).eq('id', existing.id);
+        setDbTabItems(prev => prev.map(i => i.id === existing.id ? { ...i, quantity: newQty } : i));
+      }
+    }
+  }, [dbTabItems]);
+
+  const updateTabItemNotes = useCallback(async (tabId: string, itemId: string, oldNotes: string | undefined, seat: number | undefined, status: OrderStatus, newNotes: string) => {
+    const existing = dbTabItems.find(i =>
+      i.tab_id === tabId &&
+      i.menu_item_id === itemId &&
+      i.status === status &&
+      (i.notes || '') === (oldNotes || '') &&
+      (i.seat_number || undefined) === seat
+    );
+
+    if (existing) {
+      const mergeTarget = dbTabItems.find(i =>
+        i.tab_id === tabId &&
+        i.menu_item_id === itemId &&
+        i.status === status &&
+        (i.notes || '') === (newNotes || '') &&
+        (i.seat_number || undefined) === seat &&
+        i.id !== existing.id
+      );
+
+      if (mergeTarget) {
+        const totalQty = existing.quantity + mergeTarget.quantity;
+        await (supabase.from('tab_items') as any).update({ quantity: totalQty }).eq('id', mergeTarget.id);
+        await supabase.from('tab_items').delete().eq('id', existing.id);
+        setDbTabItems(prev => prev
+          .filter(i => i.id !== existing.id)
+          .map(i => i.id === mergeTarget.id ? { ...i, quantity: totalQty } : i)
+        );
+      } else {
+        await (supabase.from('tab_items') as any).update({ notes: newNotes }).eq('id', existing.id);
+        setDbTabItems(prev => prev.map(i => i.id === existing.id ? { ...i, notes: newNotes } : i));
       }
     }
   }, [dbTabItems]);
@@ -507,11 +549,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <OrderContext.Provider
       value={{
         orders, tabs, menu, setMenu,
-        openTab, addItemToTab, updateTabItemQuantity, updateTab,
+        openTab, addItemToTab, updateTabItemQuantity, updateTabItemNotes, updateTab,
         sendToKitchen, closeTab, deleteTab, getUnsentItems,
         updateOrderStatus, getOrdersByStatus, orderCounter,
         addMenuItem, updateMenuItem, deleteMenuItem,
-        exchangeRate, setExchangeRate
+        exchangeRate, setExchangeRate, refreshData
       }}
     >
       {children}

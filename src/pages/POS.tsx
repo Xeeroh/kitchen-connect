@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ShoppingCart, Trash2, Plus, Minus, Banknote, CreditCard, ArrowRightLeft,
-  PlusCircle, X, Receipt, Check, Send, AlertCircle,
+  PlusCircle, X, Receipt, Check, Send, AlertCircle, Pencil, MessageSquare, Trash
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import {
 
 const POS = () => {
   const {
-    menu, tabs, openTab, addItemToTab, updateTabItemQuantity,
+    menu, tabs, openTab, addItemToTab, updateTabItemQuantity, updateTabItemNotes,
     updateTab, sendToKitchen, closeTab, deleteTab, getUnsentItems,
   } = useOrders();
   const navigate = useNavigate();
@@ -29,6 +29,8 @@ const POS = () => {
   const [showNewTab, setShowNewTab] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
+  const [editingItemNotes, setEditingItemNotes] = useState<{ itemId: string, notes: string | undefined, seat: number | undefined, status: any, name: string } | null>(null);
+  const [editNoteValue, setEditNoteValue] = useState("");
 
   const [fillingItem, setFillingItem] = useState<MenuItem | null>(null);
   const [activeFilling, setActiveFilling] = useState<string>("");
@@ -269,8 +271,8 @@ const POS = () => {
                   <p className="text-xs text-muted-foreground font-medium mb-1.5 flex items-center gap-1">
                     <Check className="w-3 h-3 text-success" /> Sent to kitchen
                   </p>
-                  {activeTab.sentItems.map((item) => (
-                    <div key={`sent-${item.menuItem.id}`} className="flex items-center gap-2 p-2 rounded-md bg-secondary/30 opacity-60 mb-1">
+                  {activeTab.sentItems.map((item, idx) => (
+                    <div key={`sent-${item.menuItem.id}-${idx}`} className="flex items-center gap-2 p-2 rounded-md bg-secondary/30 mb-1 group relative">
                       <span className="text-lg">{item.menuItem.emoji}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -279,6 +281,25 @@ const POS = () => {
                         </div>
                         {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                         <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setEditingItemNotes({ itemId: item.menuItem.id, notes: item.notes, seat: item.seat, status: 'sent', name: item.menuItem.name });
+                            setEditNoteValue(item.notes || "");
+                          }}
+                          className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors shadow-sm"
+                          title="Aclaración"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => updateTabItemQuantity(activeTab.id, item.menuItem.id, -1, item.notes, item.seat, 'sent')}
+                          className="p-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shadow-sm"
+                          title="Eliminar"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       <span className="text-sm text-muted-foreground w-6 text-center">×{item.quantity}</span>
                     </div>
@@ -308,6 +329,16 @@ const POS = () => {
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-medium truncate">{item.menuItem.name}</p>
                             <span className="text-[9px] bg-warning/20 text-warning px-1 rounded font-bold border border-warning/30">C{item.seat}</span>
+                            <button
+                              onClick={() => {
+                                setEditingItemNotes({ itemId: item.menuItem.id, notes: item.notes, seat: item.seat, status: 'pending', name: item.menuItem.name });
+                                setEditNoteValue(item.notes || "");
+                              }}
+                              className="p-1.5 rounded-md bg-warning/20 text-warning hover:bg-warning/30 transition-colors ml-auto shadow-sm"
+                              title="Aclaración"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           {item.notes && <p className="text-[10px] text-primary italic font-bold">» {item.notes}</p>}
                           <p className="text-xs text-muted-foreground">${(item.menuItem.price * item.quantity).toFixed(2)}</p>
@@ -484,6 +515,67 @@ const POS = () => {
               }}
             >
               {activeFilling === "Mixta" ? "Confirmar Mezcla" : "Añadir a la Cuenta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Notes Dialog */}
+      <Dialog open={!!editingItemNotes} onOpenChange={(open) => !open && setEditingItemNotes(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              Editar Aclaración
+            </DialogTitle>
+            <DialogDescription>
+              Añade notas para la cocina (Ej: Sin cebolla, extra salsa, etc.) para <b>{editingItemNotes?.name}</b>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Input
+              placeholder="Ej: Sin queso, muy picoso..."
+              autoFocus
+              value={editNoteValue}
+              onChange={(e) => setEditNoteValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (activeTabId && editingItemNotes) {
+                    updateTabItemNotes(
+                      activeTabId,
+                      editingItemNotes.itemId,
+                      editingItemNotes.notes,
+                      editingItemNotes.seat,
+                      editingItemNotes.status,
+                      editNoteValue
+                    );
+                    setEditingItemNotes(null);
+                  }
+                }
+              }}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingItemNotes(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (activeTabId && editingItemNotes) {
+                  updateTabItemNotes(
+                    activeTabId,
+                    editingItemNotes.itemId,
+                    editingItemNotes.notes,
+                    editingItemNotes.seat,
+                    editingItemNotes.status,
+                    editNoteValue
+                  );
+                  setEditingItemNotes(null);
+                }
+              }}
+            >
+              Guardar Cambios
             </Button>
           </DialogFooter>
         </DialogContent>

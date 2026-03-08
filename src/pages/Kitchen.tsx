@@ -1,12 +1,25 @@
+import { useState, useEffect } from "react";
 import { useOrders } from "@/contexts/OrderContext";
 import OrderCard from "@/components/OrderCard";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChefHat } from "lucide-react";
+import { ChefHat, RotateCw } from "lucide-react";
 
 const Kitchen = () => {
-  const { getOrdersByStatus, updateOrderStatus } = useOrders();
+  const { getOrdersByStatus, updateOrderStatus, refreshData } = useOrders();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const sent = getOrdersByStatus("sent");
+
+  useEffect(() => {
+    // Auto-refresh when entering kitchen
+    handleRefresh();
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    setIsRefreshing(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -16,6 +29,15 @@ const Kitchen = () => {
           <span className="text-xl font-bold text-primary font-heading">Kitchen</span>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RotateCw className={`w-4 h-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
+          </Button>
           <Link to="/"><Button variant="outline" size="sm">POS</Button></Link>
           <Link to="/pickup"><Button variant="outline" size="sm">Pickup</Button></Link>
         </div>

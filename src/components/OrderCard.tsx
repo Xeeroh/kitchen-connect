@@ -64,7 +64,7 @@ const OrderCard = ({ order, nextStatus, nextLabel, onAdvance }: OrderCardProps) 
             </div>
             {item.notes && (
               <span className="text-[11px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-sm self-start">
-                Guarnicion: {item.notes}
+                Nota: {item.notes}
               </span>
             )}
           </div>
