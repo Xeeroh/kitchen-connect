@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useOrders } from "@/contexts/OrderContext";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,28 +7,29 @@ import { Input } from "@/components/ui/input";
 
 const Accounting = () => {
   const { orders, tabs, exchangeRate, setExchangeRate } = useOrders();
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const stats = useMemo(() => {
-    const today = new Date();
-    const todayTabs = tabs.filter((t) => {
+    const filterDate = new Date(selectedDate + 'T00:00:00');
+    const filteredTabs = tabs.filter((t) => {
       const d = new Date(t.createdAt);
-      return d.toDateString() === today.toDateString();
+      return d.toDateString() === filterDate.toDateString();
     });
 
-    const completedTabs = todayTabs.filter((t) => t.status === "closed");
-    const openTabs = todayTabs.filter((t) => t.status === "open");
+    const completedTabs = filteredTabs.filter((t) => t.status === "closed");
+    const openTabs = filteredTabs.filter((t) => t.status === "open");
 
     const totalRevenue = completedTabs.reduce((s, t) => s + t.total, 0);
     const pendingRevenue = openTabs.reduce((s, t) => s + t.total, 0);
     const avgOrder = completedTabs.length > 0 ? totalRevenue / completedTabs.length : 0;
 
-    const todayOrders = orders.filter((o) => {
+    const filteredOrders = orders.filter((o) => {
       const d = new Date(o.createdAt);
-      return d.toDateString() === today.toDateString();
+      return d.toDateString() === filterDate.toDateString();
     });
 
-    const completed = todayOrders.filter((o) => o.status === "served");
-    const active = todayOrders.filter((o) => o.status !== "served");
+    const completed = filteredOrders.filter((o) => o.status === "served");
+    const active = filteredOrders.filter((o) => o.status !== "served");
 
     // Item breakdown (Using all items from completed tabs for accuracy)
     const itemCounts: Record<string, { name: string; qty: number; revenue: number; emoji: string }> = {};
@@ -60,8 +61,8 @@ const Accounting = () => {
       paymentBreakdown[pm].revenue += t.total;
     });
 
-    return { todayTabs, completedTabs, openTabs, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
-  }, [orders, tabs]);
+    return { filteredTabs, completedTabs, openTabs, totalRevenue, pendingRevenue, avgOrder, topItems, categoryBreakdown, paymentBreakdown };
+  }, [orders, tabs, selectedDate]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -77,11 +78,37 @@ const Accounting = () => {
       </header>
 
       <div className="flex-1 p-4 max-w-5xl mx-auto w-full space-y-6">
-        {/* Date header */}
-        <div className="text-center">
-          <p className="text-muted-foreground text-sm">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-          </p>
+        {/* Date selection and header */}
+        <div className="flex flex-col items-center gap-4 bg-card/30 p-6 rounded-xl border border-border/50 shadow-sm">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-primary font-heading">Corte del Día</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Selecciona una fecha para ver el desglose de ventas
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 bg-background p-2 rounded-lg border border-primary/20 shadow-inner">
+            <div className="p-2 bg-primary/10 rounded-md">
+              <Clock className="w-5 h-5 text-primary" />
+            </div>
+            <Input
+              type="date"
+              className="w-44 border-none focus-visible:ring-0 text-lg font-semibold cursor-pointer"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
+
+          <div className="text-center">
+            <p className="text-primary font-medium">
+              {new Date(selectedDate + 'T00:00:00').toLocaleDateString("es-MX", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+              })}
+            </p>
+          </div>
         </div>
 
         {/* Exchange Rate Setting */}
@@ -208,7 +235,7 @@ const Accounting = () => {
 
         <div className="glass-card overflow-hidden">
           <div className="p-4 border-b border-border/30">
-            <h3 className="font-semibold">Historial de Cuentas de Hoy ({stats.todayTabs.length})</h3>
+            <h3 className="font-semibold">Historial de Cuentas ({stats.filteredTabs.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -223,10 +250,10 @@ const Accounting = () => {
                 </tr>
               </thead>
               <tbody>
-                {stats.todayTabs.length === 0 && (
-                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No hay cuentas hoy</td></tr>
+                {stats.filteredTabs.length === 0 && (
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">No hay registros para esta fecha</td></tr>
                 )}
-                {[...stats.todayTabs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((tab) => (
+                {[...stats.filteredTabs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((tab) => (
                   <tr key={tab.id} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
                     <td className="p-3">
                       <div className="flex flex-col">
